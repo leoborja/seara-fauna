@@ -7,6 +7,8 @@
 
   var D = window.DADOS, M = window.MOTOR, G = window.GRAFICOS,
       A = window.ARMAZENAMENTO, B = window.GBIF;
+  var AE = window.AUTOECOLOGIA, SEC = window.SECUNDARIOS,
+      FT = window.FONTES, LO = window.LISTAS_OFICIAIS;
   var estado;
 
   /* ------------------------------------------------------------- utilidades */
@@ -43,6 +45,15 @@
     if (!iso) return '—';
     var p = String(iso).slice(0, 10).split('-');
     return p.length === 3 && p[0].length === 4 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+  }
+
+  /** Data e hora de uma consulta a fonte externa — o laudo precisa das duas. */
+  function dataHoraBR(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (!isFinite(d.getTime())) return dataBR(iso);
+    return d.toLocaleDateString('pt-BR') + ' às ' +
+      d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
   function toast(msg) {
@@ -166,7 +177,8 @@
   function confirmar(msg) { return window.confirm(msg); }
 
   /* ------------------------------------------------------------- roteador */
-  var TELAS = ['projetos', 'campanhas', 'unidades', 'registros', 'taxons', 'resultados', 'laudo', 'ajuda'];
+  var TELAS = ['projetos', 'campanhas', 'unidades', 'registros', 'taxons', 'secundarios',
+    'resultados', 'laudo', 'ajuda'];
 
   function telaAtual() {
     var h = (location.hash || '#projetos').replace('#', '');
@@ -191,6 +203,7 @@
     else if (tela === 'unidades') renderUnidades();
     else if (tela === 'registros') renderRegistros();
     else if (tela === 'taxons') renderTaxons();
+    else if (tela === 'secundarios') renderSecundarios();
     else if (tela === 'resultados') renderResultados();
     else if (tela === 'laudo') renderLaudo();
   }
@@ -345,8 +358,126 @@
         '<div class="avatar">DwC</div><div class="item-corpo"><h3>Darwin Core</h3>' +
         '<div class="item-meta"><span><code>scientificName</code>, <code>individualCount</code>, <code>eventDate</code>… ' +
         'reconhecido sozinho. É o que sai de GBIF, eBird e iNaturalist</span></div></div></button>' +
+        '<button class="item" type="button" data-acao="import-inat" style="width:100%;text-align:left;cursor:pointer">' +
+        '<div class="avatar">iN</div><div class="item-corpo"><h3>iNaturalist — direto da API</h3>' +
+        '<div class="item-meta"><span>As observações de um usuário, sem chave e sem exportar CSV</span></div></div></button>' +
+        '<button class="item" type="button" data-acao="import-ebird" style="width:100%;text-align:left;cursor:pointer">' +
+        '<div class="avatar">eB</div><div class="item-corpo"><h3>eBird — direto da API</h3>' +
+        '<div class="item-meta"><span>Observações recentes num raio. ' +
+        (FT && FT.temEbird() ? 'Chave já guardada neste aparelho' : 'Precisa de chave gratuita') +
+        '</span></div></div></button>' +
         '</div>' }],
       null, { semSalvar: true });
+  }
+
+  /* ---------------------------------------------- iNaturalist e eBird
+     Os dois caem na MESMA tela de pré-visualização e mapeamento do
+     importador: viram uma tabela Darwin Core e seguem o caminho que já
+     existe. Espécie que já está no catálogo é reaproveitada pelo nome
+     normalizado — nunca duplicada. */
+  function modalInaturalist() {
+    abrirModal('Importar do iNaturalist', [
+      { tipo: 'html', html: '<p class="card-nota" style="margin-bottom:var(--e3)">Sem chave e sem cadastro. ' +
+        'Entra o caderno de campo de <strong>um usuário</strong> — o seu, ou o de quem fez o levantamento. ' +
+        'Observação identificada só em gênero ou família é separada e não entra na riqueza.</p>' },
+      { chave: 'login', rotulo: 'Usuário do iNaturalist', obrigatorio: true, placeholder: 'como aparece em inaturalist.org/people/…',
+        valor: (estado.inatLogin || '') },
+      { chave: 'taxonId', rotulo: 'Filtrar por taxon_id (opcional)', placeholder: '3 = Aves, 40151 = Mammalia',
+        dica: 'O número do táxon no iNaturalist. Em branco traz tudo.' },
+      { chave: 'de', rotulo: 'A partir de', tipo: 'date', valor: '' },
+      { chave: 'ate', rotulo: 'Até', tipo: 'date', valor: '' }
+    ], function (d) {
+      if (!d.login) { toast('Informe o usuário.'); return; }
+      estado.inatLogin = d.login;
+      A.salvar();
+      toast('Consultando o iNaturalist…');
+      FT.inatObservacoes({ login: d.login, taxonId: d.taxonId, de: d.de, ate: d.ate })
+        .then(function (r) {
+          if (!r.ok) {
+            toast(/422|Unknown user/.test(String(r.erro))
+              ? 'O iNaturalist não conhece o usuário "' + d.login + '".'
+              : r.erro);
+            return;
+          }
+          entregarAoImportador(r.dados.resultados, {
+            fonte: 'iNaturalist', consultadoEm: r.consultadoEm,
+            arquivo: 'iNaturalist — ' + d.login,
+            metodo: 'busca ativa', observador: d.login,
+            truncado: r.dados.truncado, total: r.dados.total
+          });
+        });
+    });
+  }
+
+  function modalEbird() {
+    var at = A.ativos();
+    var par = at.projeto ? paramsSecundarios(at.projeto) : { lat: '', lon: '', raioKm: 25 };
+    abrirModal('Importar do eBird', [
+      { tipo: 'html', html: '<p class="card-nota" style="margin-bottom:var(--e3)">O eBird exige uma ' +
+        '<strong>chave de API</strong>. Ela é <strong>gratuita</strong> e sai em minutos em ' +
+        '<code>ebird.org/api/keygen</code>. Ela fica guardada <strong>neste aparelho</strong> e ' +
+        'nunca entra no backup JSON nem no código.</p>' +
+        '<p class="card-nota" style="margin-bottom:var(--e3)">O eBird não publica endpoint de ' +
+        '“minhas observações”: o que existe é <strong>por área</strong>. Por isso o que entra aqui é o ' +
+        'que a comunidade registrou na região, não o seu caderno pessoal — trate como dado de apoio.</p>' },
+      { chave: 'chave', rotulo: 'Chave de API do eBird', valor: FT.chaveEbird(),
+        dica: 'Guardada só neste navegador. Deixe em branco para apagar a que está salva.' },
+      { chave: 'lat', rotulo: 'Latitude', valor: par.lat, obrigatorio: true },
+      { chave: 'lon', rotulo: 'Longitude', valor: par.lon, obrigatorio: true },
+      { chave: 'raioKm', rotulo: 'Raio', tipo: 'number', passo: '1', valor: Math.min(par.raioKm || 25, 50),
+        sufixo: 'km', dica: 'A API do eBird aceita até 50 km.' },
+      { chave: 'dias', rotulo: 'Últimos', tipo: 'number', passo: '1', valor: 30,
+        sufixo: 'dias', dica: 'A API do eBird só devolve os últimos 30 dias.' }
+    ], function (d) {
+      FT.definirChaveEbird(d.chave);
+      if (!d.chave) { toast('Chave apagada. O eBird fica desabilitado; o resto do app não muda.'); return; }
+      var lat = parseFloat(String(d.lat).replace(',', '.'));
+      var lon = parseFloat(String(d.lon).replace(',', '.'));
+      if (!isFinite(lat) || !isFinite(lon)) { toast('Preencha latitude e longitude.'); return; }
+      toast('Consultando o eBird…');
+      FT.ebirdProximas({ lat: lat, lon: lon, raioKm: d.raioKm, dias: d.dias })
+        .then(function (r) {
+          if (!r.ok) { toast(r.erro); return; }
+          entregarAoImportador(r.dados, {
+            fonte: 'eBird', consultadoEm: r.consultadoEm,
+            arquivo: 'eBird — ' + lat.toFixed(3) + ', ' + lon.toFixed(3) + ' · ' + d.raioKm + ' km',
+            metodo: 'busca ativa'
+          });
+        });
+    });
+  }
+
+  /** Vira tabela Darwin Core e cai na tela de pré-visualização que já existe. */
+  function entregarAoImportador(observacoes, meta) {
+    var sep = SEC.filtrarEspecies(observacoes);
+    if (!sep.especies.length) {
+      toast('A ' + meta.fonte + ' não devolveu nenhuma observação identificada em espécie.');
+      return;
+    }
+    var csv = SEC.paraDarwinCore(sep.especies, {
+      metodo: meta.metodo, observador: meta.observador
+    });
+    abrirMapeamento(csv, meta.arquivo);
+    if (importPendente) {
+      importPendente.origemApi = {
+        fonte: meta.fonte, consultadoEm: meta.consultadoEm,
+        acimaDeEspecie: sep.acimaDeEspecie.length,
+        truncado: !!meta.truncado, total: meta.total
+      };
+      importPendente.opcoes.nomeProjeto = meta.arquivo;
+      renderProjetos();
+    }
+    var avisos = [];
+    if (sep.acimaDeEspecie.length) {
+      avisos.push(sep.acimaDeEspecie.length + ' observação(ões) identificada(s) acima do nível de espécie ' +
+        'ficaram de fora — contá-las inflaria a riqueza.');
+    }
+    if (meta.truncado) {
+      avisos.push('A consulta trouxe ' + observacoes.length + ' de ' + meta.total +
+        ' observações (limite de paginação). Para o conjunto inteiro, exporte o CSV no site e importe como tabela.');
+    }
+    toast(sep.especies.length + ' observação(ões) da ' + meta.fonte + ' prontas para revisão. ' +
+      avisos.join(' '));
   }
 
   function abrirMapeamento(texto, nomeArquivo) {
@@ -394,6 +525,13 @@
       '<p class="card-nota">' + tb.colunas.length + ' colunas · ' + tb.total + ' linhas · separador: ' + esc(nomeDelim) +
       (imp.darwinCore ? ' · <strong>Darwin Core reconhecido</strong>' : '') +
       (imp.lembrado ? ' · <strong>mapeamento lembrado de uma importação anterior</strong>' : '') + '</p>' +
+      (imp.origemApi ? '<div style="margin-top:var(--e3)">' + avisoHtml(
+        'Veio da API do <strong>' + esc(imp.origemApi.fonte) + '</strong>, consultada em ' +
+        esc(dataHoraBR(imp.origemApi.consultadoEm)) + '. Essa procedência fica registrada no projeto e sai no laudo.' +
+        (imp.origemApi.acimaDeEspecie ? ' ' + imp.origemApi.acimaDeEspecie +
+          ' observação(ões) identificada(s) acima do nível de espécie já foram separadas.' : '') +
+        (imp.origemApi.truncado ? ' <strong>A consulta foi truncada</strong> — veio parte do total (' +
+          esc(imp.origemApi.total) + ').' : ''), 'info') + '</div>' : '') +
       (tb.aviso ? '<div style="margin-top:var(--e3)">' + avisoHtml(esc(tb.aviso)) + '</div>' : '') +
 
       /* de-para de colunas */
@@ -544,7 +682,13 @@
       }).id;
     });
 
-    var p = A.novoProjeto({ nome: o.nomeProjeto || 'Importado', grupo: o.grupo });
+    var p = A.novoProjeto({
+      nome: o.nomeProjeto || 'Importado', grupo: o.grupo,
+      /* de onde vieram estes registros — o laudo cita a fonte */
+      origemDados: imp.origemApi
+        ? { fonte: imp.origemApi.fonte, consultadoEm: imp.origemApi.consultadoEm, via: 'API' }
+        : { fonte: imp.arquivo, consultadoEm: new Date().toISOString(), via: 'arquivo' }
+    });
     plano.campanhas.forEach(function (c) {
       var camp = A.novaCampanha(p.id, { rotulo: c.rotulo });
       c.unidades.forEach(function (u) {
@@ -1203,7 +1347,9 @@
 
   function renderTaxons() {
     var alvo = $('#taxons-conteudo');
-    ['btn-csv-taxons', 'btn-gbif-lote'].forEach(function (id) { $('#' + id).disabled = !estado.taxons.length; });
+    ['btn-csv-taxons', 'btn-gbif-lote', 'btn-auto-lote'].forEach(function (id) {
+      var b = $('#' + id); if (b) b.disabled = !estado.taxons.length;
+    });
 
     if (!estado.taxons.length) {
       alvo.innerHTML = vazioHtml('Catálogo vazio',
@@ -1222,6 +1368,9 @@
     }).length;
 
     alvo.innerHTML =
+      cardAutoecologia() +
+      cardListaOficial() +
+
       /* barra da GBIF */
       '<div class="card"><div class="card-titulo"><h2>Conferência taxonômica</h2>' +
       '<span class="card-nota">' + nVerificados + ' de ' + estado.taxons.length + ' verificados na GBIF</span></div>' +
@@ -1304,9 +1453,14 @@
       lista.map(function (t) {
         var a = t.atributos || {};
         var est = t.gbif && t.gbif.estado;
+        /* marca de divergência contra a lista oficial: é offline e instantânea,
+           então dá para calcular a cada desenho sem custo nenhum */
+        var lo = AE ? AE.conferirListaOficial(t) : null;
         return '<tr>' +
           '<td class="esq">' + nomeHtml(t, true) +
-          (t.foraDoCatalogo ? ' <span class="tag tag-terra">fora do catálogo</span>' : '') + '</td>' +
+          (t.foraDoCatalogo ? ' <span class="tag tag-terra">fora do catálogo</span>' : '') +
+          (lo && lo.grave ? ' <span class="tag tag-terra" title="' + esc(lo.texto) + '">lista oficial: ' +
+            esc(lo.sugerido || lo.situacao) + '</span>' : '') + '</td>' +
           '<td class="esq">' + esc(t.nomeComum || '—') + '</td>' +
           '<td class="esq taxon-sup">' + esc(t.ordem || '—') + '</td>' +
           '<td class="esq taxon-sup">' + esc(t.familia || '—') + '</td>' +
@@ -1323,6 +1477,7 @@
           '<td>' + fmt(uso[t.id] || 0, 0) + '</td>' +
           '<td class="esq">' + (est ? '<span class="estado-gbif ' + esc(est) + '">' + esc(rotuloEstado(est)) + '</span>' : '<span style="color:var(--texto-3)">—</span>') + '</td>' +
           '<td class="acoes-cel">' +
+          '<button class="btn btn-fantasma btn-pq" data-acao="auto-um" data-taxon="' + t.id + '" type="button" title="Preencher autoecologia a partir das fontes">' + icone('ico-varinha') + '</button>' +
           '<button class="btn btn-fantasma btn-pq" data-acao="gbif-um" data-taxon="' + t.id + '" type="button" title="Verificar na GBIF">' + icone('ico-globo') + '</button>' +
           '<button class="btn btn-fantasma btn-pq" data-acao="editar-taxon" data-taxon="' + t.id + '" type="button" title="Editar">' + icone('ico-lapis') + '</button>' +
           '<button class="btn btn-perigo btn-pq" data-acao="excluir-taxon" data-taxon="' + t.id + '" type="button" title="Excluir">' + icone('ico-lixo') + '</button>' +
@@ -1471,6 +1626,411 @@
     });
   }
 
+  /* =======================================================================
+     AUTOECOLOGIA AUTOMÁTICA — o botão de um clique
+
+     Até aqui a GBIF só resolvia o NOME. Toda a autoecologia era digitada
+     espécie por espécie, e era a maior perda de tempo do trabalho.
+
+     A regra não muda: a máquina PROPÕE, ele DECIDE. Nada entra sem ele
+     aceitar, campo já preenchido nunca é sobrescrito calado, e cada valor
+     aceito guarda de onde veio e quando — que é o que sai no laudo.
+     ==================================================================== */
+  var autoRodando = false, autoCancelar = false;
+
+  /** Todas as propostas pendentes do catálogo, achatadas para a tela. */
+  function sugestoesPendentes() {
+    var out = [];
+    estado.taxons.forEach(function (t) {
+      if (!t.sugestoes || !t.sugestoes.itens) return;
+      t.sugestoes.itens.forEach(function (p, i) {
+        if (p.decidido) return;
+        if (p.tipo === 'confirma') return;   // nada a decidir: já está igual
+        out.push({ taxon: t, p: p, i: i });
+      });
+    });
+    return out;
+  }
+
+  function contarSugestoes() {
+    var pend = sugestoesPendentes();
+    var conta = { preenche: 0, diverge: 0, grafia: 0, atencao: 0, confirma: 0, total: pend.length };
+    pend.forEach(function (x) { conta[x.p.tipo] = (conta[x.p.tipo] || 0) + 1; });
+    estado.taxons.forEach(function (t) {
+      ((t.sugestoes || {}).itens || []).forEach(function (p) {
+        if (p.tipo === 'confirma') conta.confirma++;
+      });
+    });
+    return conta;
+  }
+
+  function rotuloTipoSugestao(t) {
+    return {
+      preenche: 'campo em branco', diverge: 'diverge do que você preencheu',
+      grafia: 'mesmo nome, outra grafia', atencao: 'atenção', confirma: 'confere'
+    }[t] || t;
+  }
+
+  function cardAutoecologia() {
+    var comSug = estado.taxons.filter(function (t) { return t.sugestoes; }).length;
+    var c = contarSugestoes();
+    var cob = AE.cobertura(estado.taxons, grupoDoCatalogo());
+    var pend = sugestoesPendentes();
+
+    var h = '<div class="card"><div class="card-titulo"><h2>Autoecologia automática</h2>' +
+      '<span class="card-nota">' + comSug + ' de ' + estado.taxons.length + ' táxons consultados</span></div>' +
+
+      '<p class="card-nota" style="margin-bottom:var(--e3)">Um clique consulta a <strong>GBIF</strong> ' +
+      '(hierarquia completa, autoria, ano e nome comum em português), o <strong>iNaturalist</strong> ' +
+      '(categoria de conservação) e a <strong>Lista Nacional</strong> embutida — e propõe o preenchimento. ' +
+      '<strong>Nada é gravado sem você aceitar</strong>, e campo que você já preencheu nunca é ' +
+      'sobrescrito sem ordem sua.</p>' +
+
+      '<div class="gbif-barra" id="auto-barra">' +
+      '<div class="progresso"><i id="auto-progresso" style="width:' +
+      (estado.taxons.length ? (comSug / estado.taxons.length * 100) : 0) + '%"></i></div>' +
+      '<span class="progresso-txt" id="auto-texto">' +
+      (c.total ? c.total + (c.total === 1 ? ' sugestão' : ' sugestões') + ' aguardando decisão'
+        : (comSug ? 'nenhuma sugestão pendente' : 'ainda não consultado')) +
+      '</span>' +
+      '<button class="btn btn-pq" data-acao="auto-lote" type="button">' + icone('ico-varinha') +
+      (autoRodando ? ' Parar' : ' Preencher autoecologia') + '</button>' +
+      '</div>' +
+
+      '<div class="painel-num" style="margin-top:var(--e4)">' +
+      numCx(pct(cob.perc, 0), 'campos preenchidos', fmt(cob.preenchidos, 0) + ' de ' + fmt(cob.total, 0)) +
+      numCx(fmt(c.preenche, 0), 'a preencher', 'campos em branco') +
+      numCx(fmt(c.diverge, 0), 'divergências', 'você × fonte', c.diverge > 0) +
+      numCx(fmt(c.grafia, 0), 'grafia', 'mesmo nome, com hífen') +
+      numCx(fmt(c.atencao, 0), 'atenção', 'decisão individual', c.atencao > 0) +
+      numCx(fmt(c.confirma, 0), 'confirmados', 'fonte concorda') +
+      '</div>';
+
+    if (pend.length) {
+      h += '<div class="acoes" style="margin-top:var(--e4)">' +
+        (c.preenche ? '<button class="btn btn-pq" data-acao="auto-aceitar-vazios" type="button">' +
+          icone('ico-check') + ' Aceitar os ' + c.preenche + ' campos em branco</button>' : '') +
+        (c.grafia ? '<button class="btn btn-sec btn-pq" data-acao="auto-aceitar-grafia" type="button">' +
+          icone('ico-check') + ' Adotar a grafia das fontes (' + c.grafia + ')</button>' : '') +
+        (c.preenche + c.diverge + c.grafia ? '<button class="btn btn-sec btn-pq" data-acao="auto-aceitar-todos" type="button">' +
+          icone('ico-check') + ' Aceitar todos (' + (c.preenche + c.diverge + c.grafia) + ')</button>' : '') +
+        '<button class="btn btn-fantasma btn-pq" data-acao="auto-recusar-todos" type="button">' +
+        icone('ico-x') + ' Recusar tudo</button>' +
+        '</div>' +
+        (c.atencao ? '<div style="margin-top:var(--e3)">' + avisoHtml(
+          '<strong>' + c.atencao + (c.atencao === 1 ? ' sugestão marcada' : ' sugestões marcadas') +
+          ' como “atenção”</strong> fica' + (c.atencao === 1 ? '' : 'm') +
+          ' de fora do “aceitar todos”: é categoria de autoridade que não é a IUCN, espécie que a ' +
+          'lista oficial só traz como subespécie, ou troca de gênero — que mudaria o nome científico. ' +
+          'Cada uma pede decisão individual.') + '</div>' : '') +
+        tabelaSugestoes(pend);
+    } else if (comSug) {
+      h += '<div style="margin-top:var(--e4)">' + avisoHtml(
+        'Nenhuma sugestão pendente. Tudo o que as fontes propuseram já foi decidido por você.', 'info') + '</div>';
+    }
+
+    /* O QUE A FONTE NÃO TEM. Silêncio de API é fácil de confundir com dado:
+       o iNaturalist só publica `conservation_status` para quem NÃO é LC, e
+       um app que traduzisse essa ausência em "LC" estaria inventando
+       categoria de conservação no laudo. */
+    if (comSug) {
+      var semIucn = estado.taxons.filter(function (t) {
+        return t.sugestoes && !((t.sugestoes.itens || []).some(function (p) {
+          return p.chave === 'iucn' && p.sugerido;
+        }));
+      }).length;
+      if (semIucn) {
+        h += '<div style="margin-top:var(--e3)">' + avisoHtml(
+          '<strong>' + semIucn + ' de ' + comSug + ' táxons voltaram sem categoria IUCN.</strong> ' +
+          'O iNaturalist só publica a categoria de quem <em>não</em> é “pouco preocupante” — ' +
+          'ausência de resposta <strong>não quer dizer LC</strong>, quer dizer que não há registro. ' +
+          'Se o laudo precisa da coluna IUCN preenchida, ela vai ter que ser digitada.', 'info') + '</div>';
+      }
+    }
+
+    /* falhas: dizer QUAL fonte não respondeu, não um “erro” genérico */
+    var falhas = {};
+    estado.taxons.forEach(function (t) {
+      ((t.sugestoes || {}).falhas || []).forEach(function (f) {
+        falhas[f.fonte] = (falhas[f.fonte] || 0) + 1;
+      });
+    });
+    var kf = Object.keys(falhas);
+    if (kf.length) {
+      h += '<div style="margin-top:var(--e3)" class="avisos-pilha">' + kf.map(function (k) {
+        return avisoHtml('<strong>' + esc(k) + '</strong> não respondeu em ' + falhas[k] +
+          ' táxon(s). O que as outras fontes trouxeram está aqui; rode de novo quando houver rede.');
+      }).join('') + '</div>';
+    }
+
+    return h + '</div>';
+  }
+
+  function tabelaSugestoes(pend) {
+    var TETO = 200;
+    var mostra = pend.slice(0, TETO);
+    return '<div class="tabela-envolve" style="margin-top:var(--e4)"><table class="tabela"><thead><tr>' +
+      '<th class="esq">Espécie</th><th class="esq">Campo</th><th class="esq">Valor atual</th>' +
+      '<th class="esq">Proposto</th><th class="esq">Fonte e data da consulta</th><th></th>' +
+      '</tr></thead><tbody>' +
+      mostra.map(function (x) {
+        var p = x.p;
+        var classe = p.tipo === 'diverge' ? ' tag-terra' : (p.tipo === 'atencao' ? ' tag-terra' : '');
+        return '<tr>' +
+          '<td class="esq">' + nomeHtml(x.taxon) + '</td>' +
+          '<td class="esq">' + esc(p.rotulo) +
+          '<br><span class="tag' + classe + '" style="margin-top:3px">' + esc(rotuloTipoSugestao(p.tipo)) + '</span></td>' +
+          '<td class="esq">' + (p.atual
+            ? '<span class="div-de">' + esc(p.atual) + '</span>'
+            : '<span style="color:var(--texto-3)">(em branco)</span>') + '</td>' +
+          '<td class="esq"><span class="div-para">' + esc(p.sugerido || '—') + '</span></td>' +
+          /* o `div` não é enfeite: `max-width` num `td` de tabela auto é
+             ignorado pelo algoritmo de largura de coluna, e a nota saía
+             cortada na borda do rolamento */
+          '<td class="esq"><div class="cel-fonte">' + esc(p.fonte || '—') +
+          (p.consultadoEm ? '<br><span class="cel-fonte-data">consultado em ' +
+            esc(dataBR(p.consultadoEm)) + '</span>' : '') +
+          (p.nota ? '<br><span class="cel-fonte-nota">' + esc(p.nota) + '</span>' : '') +
+          '</div></td>' +
+          '<td class="acoes-cel">' +
+          '<button class="btn btn-pq" data-acao="sug-aceitar" data-taxon="' + x.taxon.id + '" data-i="' + x.i + '" type="button" title="Aceitar">' + icone('ico-check') + '</button>' +
+          '<button class="btn btn-sec btn-pq" data-acao="sug-recusar" data-taxon="' + x.taxon.id + '" data-i="' + x.i + '" type="button" title="Recusar">' + icone('ico-x') + '</button>' +
+          '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (pend.length > TETO ? '<p class="card-nota" style="margin-top:6px">Mostrando ' + TETO +
+        ' de ' + pend.length + ' sugestões. Decida estas e as próximas aparecem.</p>' : '');
+  }
+
+  function guardarSugestoes(res) {
+    var t = res.taxon;
+    /* Sugestão de campo que já tem divergência da GBIF esperando decisão sai
+       daqui: seria a mesma pergunta feita duas vezes, em duas telas. */
+    var pendentesGbif = {};
+    ((t.gbif && t.gbif.divergencias) || []).forEach(function (d) {
+      if (!d.decidido) pendentesGbif[d.chave] = 1;
+    });
+
+    /* Decisão que ele já tomou não volta a ser perguntada. */
+    var jaDecidido = {};
+    ((t.sugestoes || {}).itens || []).forEach(function (p) {
+      if (p.decidido) jaDecidido[p.alvo + ':' + p.chave + ':' + p.sugerido] = p.decidido;
+    });
+
+    var itens = res.propostas.filter(function (p) {
+      return !(p.alvo === 'taxon' && pendentesGbif[p.chave]);
+    });
+    itens.forEach(function (p) {
+      var d = jaDecidido[p.alvo + ':' + p.chave + ':' + p.sugerido];
+      if (d) p.decidido = d;
+    });
+
+    t.sugestoes = { em: res.consultadoEm, itens: itens, falhas: res.falhas };
+    A.salvar();
+  }
+
+  function decidirSugestao(taxonId, i, aceitar) {
+    var t = A.acharTaxon(taxonId);
+    if (!t || !t.sugestoes || !t.sugestoes.itens[i]) return;
+    var p = t.sugestoes.itens[i];
+    if (aceitar) AE.aplicar(t, p);
+    p.decidido = aceitar ? 'aceita' : 'recusada';
+    A.salvar();
+    renderTaxons();
+    toast(aceitar
+      ? p.rotulo + ' de ' + M.nomeCientifico(t) + ': preenchido com “' + p.sugerido + '”.'
+      : 'Sugestão recusada — o dado continua como estava.');
+  }
+
+  function decidirEmLote(tipos, aceitar) {
+    var n = 0;
+    estado.taxons.forEach(function (t) {
+      ((t.sugestoes || {}).itens || []).forEach(function (p) {
+        if (p.decidido || p.tipo === 'confirma') return;
+        if (tipos.indexOf(p.tipo) < 0) return;
+        if (aceitar) AE.aplicar(t, p);
+        p.decidido = aceitar ? 'aceita' : 'recusada';
+        n++;
+      });
+    });
+    A.salvar();
+    renderTaxons();
+    toast(aceitar ? n + ' campo(s) preenchido(s) a partir das fontes.'
+      : n + ' sugestão(ões) recusada(s) — nada mudou no seu dado.');
+  }
+
+  function autoUm(taxonId) {
+    var t = A.acharTaxon(taxonId);
+    if (!t) return;
+    toast('Consultando GBIF, iNaturalist e a lista oficial…');
+    AE.consultarTaxon(t).then(function (res) {
+      guardarSugestoes(res);
+      renderTaxons();
+      var pend = res.propostas.filter(function (p) { return !p.decidido && p.tipo !== 'confirma'; }).length;
+      if (res.offline) {
+        toast('Sem conexão. O cruzamento com a lista oficial (que é offline) foi feito; o resto fica para depois.');
+      } else {
+        toast(M.nomeCientifico(t) + ': ' + (pend ? pend + ' sugestão(ões) para decidir.' : 'nada a propor — já está completo.'));
+      }
+    });
+  }
+
+  function autoLote() {
+    if (autoRodando) { autoCancelar = true; return; }
+    var lista = estado.taxons.slice();
+    if (!lista.length) return;
+    autoRodando = true; autoCancelar = false;
+    renderTaxons();
+
+    var barra = $('#auto-progresso'), txt = $('#auto-texto');
+
+    AE.consultarLote(lista, function (feito, total, res) {
+      guardarSugestoes(res);
+      if (barra) barra.style.width = (feito / total * 100) + '%';
+      if (txt) txt.textContent = feito + ' de ' + total + ' — ' + M.nomeCientifico(res.taxon);
+    }, function () { return autoCancelar; }).then(function (saida) {
+      autoRodando = false;
+      var offline = saida.some(function (x) { return x.offline; });
+      renderTaxons();
+      var c = contarSugestoes();
+      if (offline) {
+        toast('A rede caiu. O que já foi consultado está salvo, e o cruzamento com a lista oficial ' +
+          'continua funcionando — ele é offline.');
+      } else if (autoCancelar) {
+        toast('Interrompido. O que já foi consultado está salvo.');
+      } else {
+        toast('Pronto: ' + saida.length + ' táxons consultados, ' + c.total + ' sugestão(ões) para você decidir.');
+      }
+    }).catch(function (e) {
+      autoRodando = false;
+      renderTaxons();
+      toast('Falha ao preencher: ' + e.message);
+    });
+  }
+
+  /* =======================================================================
+     LISTA NACIONAL — cruzamento automático e OFFLINE
+
+     É o de maior valor legal e o que não depende de rede nenhuma: a lista
+     está embutida. Roda sozinho toda vez que a tela desenha, ou seja, assim
+     que um táxon entra no catálogo.
+     ==================================================================== */
+  function cardListaOficial() {
+    if (!LO || !AE) return '';
+    var cr = AE.cruzarListaOficial(estado.taxons);
+
+    /* pendentes = ainda não decididas por ele */
+    var pend = cr.divergencias.filter(function (x) {
+      var d = x.taxon.listaOficial;
+      return !(d && d.situacao === x.situacao && d.sugerido === x.sugerido);
+    });
+
+    /* O NÚMERO QUE PEGA O ERRO: quantas o catálogo declara ameaçadas na
+       Portaria, contra quantas a lista oficial diz que são. Na planilha de
+       origem o resumo declarava "Ameaçada BR: 0" — e o certo era 1. */
+    var declaradas = estado.taxons.filter(function (t) {
+      return D.ehAmeaca((t.atributos || {}).listaNacional);
+    }).length;
+    var oficiais = cr.ameacadasOficial.length;
+
+    var h = '<div class="card"><div class="card-titulo">' +
+      '<h2>Lista Nacional de Espécies Ameaçadas</h2>' +
+      '<span class="card-nota">cruzamento automático · funciona sem internet</span></div>' +
+
+      '<div class="painel-num">' +
+      numCx(fmt(cr.naLista.length, 0), 'na lista oficial', 'de ' + fmt(estado.taxons.length, 0) + ' táxons') +
+      numCx(fmt(oficiais, 0), 'ameaçadas (oficial)', 'VU, EN, CR, RE, EW, EX', oficiais > 0) +
+      numCx(fmt(declaradas, 0), 'ameaçadas (catálogo)', 'coluna Portaria MMA', declaradas !== oficiais) +
+      numCx(fmt(cr.subespecies.length, 0), 'só a subespécie', 'não conta como ameaçada') +
+      numCx(fmt(pend.length, 0), 'divergências', 'aguardando decisão', pend.length > 0) +
+      '</div>';
+
+    if (cr.subespecies.length) {
+      h += '<div style="margin-top:var(--e4)">' + avisoHtml(
+        '<strong>' + cr.subespecies.length + (cr.subespecies.length === 1
+          ? ' espécie aparece na lista oficial apenas como subespécie'
+          : ' espécies aparecem na lista oficial apenas como subespécie') + '</strong> — ' +
+        cr.subespecies.map(function (x) {
+          return '<i>' + esc(M.nomeCientifico(x.taxon)) + '</i>';
+        }).join(', ') + '. A lista protege a subespécie, não a espécie inteira, então elas ' +
+        '<strong>não</strong> entram na conta de ameaçadas. Se a população levantada for dessa ' +
+        'subespécie, preencha à mão — a decisão é sua.', 'info') + '</div>';
+    }
+
+    if (declaradas !== oficiais) {
+      h += '<div style="margin-top:var(--e4)">' + avisoHtml(
+        '<strong>O catálogo declara ' + declaradas + ' espécie' + (declaradas === 1 ? '' : 's') +
+        ' ameaçada' + (declaradas === 1 ? '' : 's') + ' na Portaria do MMA, e a lista oficial aponta ' +
+        oficiais + '.</strong> Um laudo que informa o número errado de espécies ameaçadas é ' +
+        'passivo — resolva as divergências abaixo antes de assinar.') + '</div>';
+    }
+
+    if (pend.length) {
+      h += '<div class="tabela-envolve" style="margin-top:var(--e4)"><table class="tabela"><thead><tr>' +
+        '<th class="esq">Espécie</th><th class="esq">No catálogo</th><th class="esq">Na lista oficial</th>' +
+        '<th class="esq">O que isso quer dizer</th><th></th></tr></thead><tbody>' +
+        pend.map(function (x) {
+          var podeAplicar = x.situacao === 'faltando' || x.situacao === 'diferente';
+          return '<tr>' +
+            '<td class="esq">' + nomeHtml(x.taxon) +
+            (x.oficial ? '<br><span class="taxon-sup" style="font-size:.76rem;color:var(--texto-3)">' +
+              esc(x.oficial.familia || '') + ' · ' + esc(x.oficial.grupo || '') + '</span>' : '') + '</td>' +
+            '<td class="esq">' + (x.atual
+              ? '<span class="tag tag-terra">' + esc(x.atual) + '</span>'
+              : '<span style="color:var(--texto-3)">(em branco)</span>') + '</td>' +
+            '<td class="esq">' + (x.sugerido
+              ? '<span class="tag tag-verde">' + esc(x.sugerido) + '</span>' +
+                (x.oficial && x.oficial.ano ? ' <span style="color:var(--texto-3);font-size:.78rem">' + x.oficial.ano + '</span>' : '')
+              : '<span style="color:var(--texto-3)">não consta como espécie</span>') + '</td>' +
+            '<td class="esq"><div class="cel-fonte">' + esc(x.texto) + '</div></td>' +
+            '<td class="acoes-cel">' +
+            (podeAplicar
+              ? '<button class="btn btn-pq" data-acao="lo-aceitar" data-taxon="' + x.taxon.id + '" type="button" title="Preencher com a categoria oficial">' + icone('ico-check') + '</button>'
+              : '') +
+            '<button class="btn btn-sec btn-pq" data-acao="lo-recusar" data-taxon="' + x.taxon.id + '" type="button" title="' +
+            (podeAplicar ? 'Recusar' : 'Já vi, não mexer') + '">' + icone('ico-x') + '</button>' +
+            '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    } else if (cr.naLista.length) {
+      h += '<div style="margin-top:var(--e4)">' + avisoHtml(
+        'Nenhuma divergência pendente contra a lista oficial.', 'info') + '</div>';
+    } else {
+      h += '<div style="margin-top:var(--e4)">' + avisoHtml(
+        'Nenhum táxon do catálogo consta da lista oficial embutida.', 'info') + '</div>';
+    }
+
+    /* As duas honestidades obrigatórias, na própria tela onde o dado aparece */
+    h += '<div class="avisos-pilha" style="margin-top:var(--e4)">' +
+      avisoHtml('<strong>Fonte:</strong> ' + esc(LO.FONTE.nome) + ' — ' + esc(LO.FONTE.portal) +
+        ', ' + esc(LO.FONTE.orgao) + '. ' + esc(LO.FONTE.taxons) + ' táxons, licença ' +
+        esc(LO.FONTE.licenca) + '. Convertida em ' + esc(dataBR(LO.FONTE.convertidoEm)) + '. ' +
+        '<strong>' + esc(LO.FONTE.limitacao) + '</strong>') +
+      avisoHtml('<strong>Listas estaduais:</strong> ' + esc(LO.ESTADUAIS.nota)) +
+      '</div></div>';
+    return h;
+  }
+
+  function decidirListaOficial(taxonId, aceitar) {
+    var t = A.acharTaxon(taxonId);
+    if (!t) return;
+    var x = AE.conferirListaOficial(t);
+    if (aceitar && x.sugerido) {
+      AE.aplicar(t, {
+        chave: 'listaNacional', alvo: 'atributo', sugerido: x.sugerido,
+        fonte: 'Lista Nacional (MMA) · reavaliação 2021',
+        consultadoEm: LO.FONTE.convertidoEm
+      });
+      /* reconfere: depois de aplicar, a situação vira 'confere' */
+      t.listaOficial = { situacao: 'confere', sugerido: x.sugerido, em: new Date().toISOString(), decisao: 'aceita' };
+    } else {
+      t.listaOficial = { situacao: x.situacao, sugerido: x.sugerido, em: new Date().toISOString(), decisao: 'recusada' };
+    }
+    A.salvar();
+    renderTaxons();
+    toast(aceitar
+      ? M.nomeCientifico(t) + ': Portaria MMA preenchida com ' + x.sugerido + '.'
+      : 'Anotado. O dado continua como estava e a divergência não volta a perguntar.');
+  }
+
   /* --------------------------------------------------------- form de táxon */
   function formTaxon(t) {
     var grupo = (t && t.grupo) || grupoDoProjeto();
@@ -1510,7 +2070,260 @@
   }
 
   /* =======================================================================
-     TELA 6 — RESULTADOS
+     TELA 6 — DADOS SECUNDÁRIOS
+
+     Substitui a garimpagem bibliográfica. Na planilha, a aba `Outros` trazia
+     UMA referência digitada à mão; aqui vem a lista inteira do que já foi
+     publicado na região, direto da GBIF, com o filtro e a data guardados
+     para o laudo poder citar a fonte.
+     ==================================================================== */
+  var secRodando = false, secCancelar = false, secProgresso = '';
+
+  function paramsSecundarios(p) {
+    var g = (p.secundariosGbif && p.secundariosGbif.filtro) || {};
+    var centro = SEC.centroDoProjeto(p);
+    return {
+      lat: g.lat !== undefined && g.lat !== null ? g.lat : (centro ? centro.lat : ''),
+      lon: g.lon !== undefined && g.lon !== null ? g.lon : (centro ? centro.lon : ''),
+      raioKm: g.raioKm || 20,
+      grupo: g.grupo || p.grupo || 'aves',
+      centro: centro
+    };
+  }
+
+  function renderSecundarios() {
+    var at = A.ativos();
+    var alvo = $('#secundarios-conteudo');
+    if (!at.projeto) {
+      alvo.innerHTML = vazioHtml('Nenhum projeto aberto',
+        'Escolha um projeto para levantar os dados secundários da região dele.',
+        '<a class="btn" href="#projetos">Ir para Projetos</a>');
+      $('#sub-secundarios').textContent =
+        'O que a literatura já registrou na região, direto da GBIF.';
+      return;
+    }
+    var p = at.projeto;
+    $('#sub-secundarios').textContent = p.nome + ' · ' + (p.municipio || '—') + (p.uf ? '/' + p.uf : '');
+
+    var par = paramsSecundarios(p);
+    var sg = p.secundariosGbif || null;
+
+    var h = trilha(1) +
+      '<div class="card"><div class="card-titulo"><h2>Buscar na GBIF</h2>' +
+      '<span class="card-nota">sem chave, sem cadastro</span></div>' +
+      '<p class="card-nota" style="margin-bottom:var(--e4)">A busca é por <strong>raio em volta de um ponto</strong> ' +
+      '(<code>geoDistance</code>) e por <strong>classe do grupo do projeto</strong>. A chave numérica da classe é ' +
+      'perguntada à própria GBIF — não está cravada no código.</p>' +
+
+      '<div class="grade grade-4">' +
+      '<div class="campo"><label for="sec-lat">Latitude</label>' +
+      '<input id="sec-lat" type="text" inputmode="decimal" value="' + esc(par.lat) + '" placeholder="-20,3778"></div>' +
+      '<div class="campo"><label for="sec-lon">Longitude</label>' +
+      '<input id="sec-lon" type="text" inputmode="decimal" value="' + esc(par.lon) + '" placeholder="-43,4161"></div>' +
+      '<div class="campo"><label for="sec-raio">Raio</label>' +
+      '<div class="campo-unidade"><input id="sec-raio" type="number" step="any" min="1" value="' + esc(par.raioKm) + '">' +
+      '<span class="sufixo">km</span></div></div>' +
+      '<div class="campo"><label for="sec-grupo">Grupo faunístico</label><select id="sec-grupo">' +
+      D.GRUPOS.map(function (g) {
+        var cls = (g.classesGbif || []).join(' + ');
+        return '<option value="' + g.chave + '"' + (par.grupo === g.chave ? ' selected' : '') + '>' +
+          esc(g.rotulo) + (cls && cls !== g.rotulo ? ' — ' + esc(cls) : '') + '</option>';
+      }).join('') + '</select></div>' +
+      '</div>' +
+
+      (par.centro
+        ? '<p class="card-nota" style="margin-top:var(--e2)">Ponto sugerido: média das coordenadas de ' +
+          par.centro.unidades + ' unidade(s) amostral(is) deste projeto.</p>'
+        : (sg
+            ? '<p class="card-nota" style="margin-top:var(--e2)">Ponto digitado por você — nenhuma unidade ' +
+              'amostral deste projeto tem coordenada preenchida.</p>'
+            : '<div style="margin-top:var(--e3)">' + avisoHtml(
+                'Nenhuma unidade amostral tem coordenada preenchida, então <strong>não há de onde tirar o ponto</strong> — ' +
+                'digite a latitude e a longitude da área. O app não chuta a coordenada do município.') + '</div>')) +
+
+      '<div class="acoes" style="margin-top:var(--e4)">' +
+      '<button class="btn" data-acao="sec-buscar" type="button">' + icone('ico-lupa') +
+      (secRodando ? ' Parar' : ' Buscar ocorrências') + '</button>' +
+      (sg ? '<button class="btn btn-sec" data-acao="sec-atualizar" type="button">' + icone('ico-globo') +
+        ' Refazer sem usar o cache</button>' : '') +
+      '</div>' +
+      (secRodando ? '<div class="gbif-barra" style="margin-top:var(--e3)">' +
+        '<div class="progresso"><i id="sec-progresso" style="width:0%"></i></div>' +
+        '<span class="progresso-txt" id="sec-texto">' + esc(secProgresso || 'consultando…') + '</span></div>' : '') +
+      '</div>';
+
+    if (!sg) {
+      h += '<div class="card">' + vazioHtml('Nenhum levantamento secundário ainda',
+        'Confirme o ponto e o raio acima e clique em <strong>Buscar ocorrências</strong>. ' +
+        'A GBIF devolve o que já foi publicado na região; o app cruza com o seu levantamento de campo ' +
+        'e separa em <strong>exclusivas do primário</strong>, <strong>em comum</strong> e ' +
+        '<strong>esperadas para a região mas não detectadas</strong>.') + '</div>';
+      alvo.innerHTML = h;
+      ligarSecundarios();
+      return;
+    }
+
+    /* ---------------------------------------------------- o que voltou */
+    var f = sg.filtro || {};
+    h += '<div class="card"><div class="card-titulo"><h2>O que a GBIF tem nesta área</h2>' +
+      '<span class="card-nota">consultado em ' + esc(dataHoraBR(sg.consultadoEm)) + '</span></div>' +
+      '<div class="painel-num">' +
+      numCx(fmt(sg.ocorrencias, 0), 'ocorrências', 'com coordenada') +
+      numCx(fmt(sg.especies.length, 0), 'espécies', 'resolvidas em nome') +
+      numCx(fmt(f.raioKm, 0) + ' km', 'raio', 'em volta do ponto') +
+      numCx(esc((f.classes || []).join(' + ') || 'todas'), 'classe', 'filtro de grupo') +
+      '</div>' +
+      '<p class="card-nota fonte" style="margin-top:var(--e3)"><strong>Filtro exato usado</strong> — ' +
+      'geoDistance ' + esc(f.lat) + ', ' + esc(f.lon) + ', ' + esc(f.raioKm) + ' km · ' +
+      'taxonKey ' + esc((f.taxonKeys || []).join(', ') || '—') + ' · hasCoordinate=true · ' +
+      'facet=speciesKey (até ' + esc(f.limiteEspecies) + '). Fonte: ' + esc(sg.fonte) + '. ' +
+      'É esta linha que vai na citação do laudo.</p>' +
+      (sg.naoResolvidas ? '<div style="margin-top:var(--e3)">' + avisoHtml(
+        sg.naoResolvidas + ' chave(s) de espécie não puderam ser resolvidas em nome e ficaram de fora.') + '</div>' : '') +
+      (sg.parcial ? '<div style="margin-top:var(--e3)">' + avisoHtml(
+        'A resolução dos nomes foi <strong>interrompida</strong> — a lista está incompleta. Rode de novo.') + '</div>' : '') +
+      '</div>';
+
+    /* ------------------------------------------------------ cruzamento */
+    var mapaTx = A.taxonsPorId();
+    var prim = [];
+    p.campanhas.forEach(function (c) {
+      c.unidades.forEach(function (u) {
+        (u.registros || []).forEach(function (r) {
+          var t = mapaTx[r.taxonId];
+          if (t) prim.push(M.nomeCientifico(t));
+        });
+      });
+    });
+    var cz = SEC.cruzar(prim, sg.especies);
+
+    h += '<div class="card"><div class="card-titulo"><h2>Primários × secundários</h2>' +
+      '<span class="card-nota">' + fmt(cz.riquezaPrimaria, 0) + ' em campo · ' +
+      fmt(cz.riquezaSecundaria, 0) + ' na região</span></div>' +
+      '<div class="painel-num">' +
+      numCx(fmt(cz.soPrimario.length, 0), 'só no primário', 'o que o campo achou e a região não tinha') +
+      numCx(fmt(cz.comuns.length, 0), 'em comum', 'corroboradas') +
+      numCx(fmt(cz.esperadas.length, 0), 'esperadas não detectadas', 'a região tem, o campo não pegou', cz.esperadas.length > 0) +
+      numCx(pct(cz.cobertura, 0), 'cobertura', 'do que a região tem') +
+      numCx(pct(cz.jaccard, 0), 'Jaccard', 'similaridade das listas') +
+      '</div>' +
+
+      '<div class="avisos-pilha" style="margin-top:var(--e4)">' + avisoHtml(
+        'A terceira lista é a que dá argumento ao laudo: <strong>' + cz.esperadas.length +
+        ' espécie(s) já registrada(s) nesta área não apareceram no levantamento</strong>. ' +
+        'Ou o esforço foi insuficiente, ou elas deixaram a área — as duas conclusões são do laudo, ' +
+        'e as duas precisam ser escritas por você, não pelo app.', 'info') +
+      /* Armadilha real: o cruzamento é por NOME. Um sinônimo não resolvido no
+         catálogo não casa com o nome aceito da GBIF e aparece como exclusivo
+         do primário — parecendo achado quando é erro de nomenclatura. */
+      avisoHtml('O cruzamento é <strong>por nome científico</strong>. Espécie que ainda está no ' +
+        'catálogo com um <strong>sinônimo</strong> não casa com o nome aceito na GBIF e cai em ' +
+        '“exclusivas do primário” parecendo um achado. Rode a <strong>Conferência taxonômica</strong> ' +
+        'em Táxons antes de levar esta comparação para o laudo.') + '</div>' +
+
+      tabelaCruzamento('Esperadas para a região e não detectadas', cz.esperadas, true) +
+      tabelaCruzamento('Em comum', cz.comuns, true) +
+      tabelaCruzamento('Exclusivas do levantamento primário', cz.soPrimario, false) +
+      '</div>';
+
+    /* ----------------------------------- a lista bibliográfica manual */
+    var sec = (p.secundarios && p.secundarios.especies) || [];
+    h += '<div class="card"><div class="card-titulo"><h2>Lista bibliográfica digitada</h2>' +
+      '<button class="btn btn-sec btn-pq" data-acao="editar-secundarios" type="button">' +
+      icone('ico-lapis') + ' Editar lista</button></div>' +
+      '<p class="card-nota">A comparação com a GBIF acima não substitui uma referência específica da área. ' +
+      'Esta lista continua aqui para quando houver um levantamento publicado que valha citar nominalmente.</p>' +
+      (sec.length ? '<p class="card-nota" style="margin-top:var(--e2)">' + fmt(sec.length, 0) +
+        ' espécie(s) digitada(s)' + (p.secundarios.titulo ? ' — ' + esc(p.secundarios.titulo) : '') + '.</p>' : '');
+    h += '</div>';
+
+    alvo.innerHTML = h;
+    ligarSecundarios();
+  }
+
+  function tabelaCruzamento(titulo, lista, comOcorrencias) {
+    if (!lista.length) return '<h3 style="margin-top:var(--e5);margin-bottom:var(--e2)">' + esc(titulo) +
+      ' (0)</h3><div class="grafico-vazio">Nenhuma.</div>';
+    var TETO = 400;
+    return '<h3 style="margin-top:var(--e5);margin-bottom:var(--e2)">' + esc(titulo) + ' (' + lista.length + ')</h3>' +
+      '<div class="tabela-envolve"><table class="tabela"><thead><tr>' +
+      '<th class="esq">Espécie</th><th class="esq">Ordem</th><th class="esq">Família</th>' +
+      (comOcorrencias ? '<th>Ocorrências na GBIF</th>' : '') + '</tr></thead><tbody>' +
+      lista.slice(0, TETO).map(function (e) {
+        return '<tr><td class="esq"><i class="cientifico">' + esc(e.nome) + '</i></td>' +
+          '<td class="esq taxon-sup">' + esc(e.ordem || '—') + '</td>' +
+          '<td class="esq taxon-sup">' + esc(e.familia || '—') + '</td>' +
+          (comOcorrencias ? '<td>' + (e.ocorrencias === null || e.ocorrencias === undefined ? '—' : fmt(e.ocorrencias, 0)) + '</td>' : '') +
+          '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      (lista.length > TETO ? '<p class="card-nota" style="margin-top:6px">Mostrando ' + TETO + ' de ' + lista.length + '.</p>' : '');
+  }
+
+  function ligarSecundarios() {
+    ['sec-lat', 'sec-lon', 'sec-raio', 'sec-grupo'].forEach(function (id) {
+      var el = $('#' + id);
+      if (el) el.addEventListener('change', function () { /* lido na hora de buscar */ });
+    });
+  }
+
+  function lerParamsSecundarios() {
+    function n(id) {
+      var el = $('#' + id);
+      return el ? parseFloat(String(el.value).replace(',', '.')) : NaN;
+    }
+    var g = $('#sec-grupo');
+    return {
+      lat: n('sec-lat'), lon: n('sec-lon'), raioKm: n('sec-raio') || 20,
+      grupo: g ? g.value : grupoDoProjeto()
+    };
+  }
+
+  function buscarSecundarios(semCache) {
+    if (secRodando) { secCancelar = true; return; }
+    var at = A.ativos();
+    if (!at.projeto) return;
+    var par = lerParamsSecundarios();
+    if (!isFinite(par.lat) || !isFinite(par.lon)) {
+      toast('Preencha a latitude e a longitude da área. Sem ponto não há raio.');
+      return;
+    }
+    secRodando = true; secCancelar = false; secProgresso = 'descobrindo a chave da classe na GBIF…';
+    renderSecundarios();
+
+    SEC.levantar({
+      lat: par.lat, lon: par.lon, raioKm: par.raioKm, grupo: par.grupo, semCache: !!semCache
+    }, function (etapa, feitas, total) {
+      var barra = $('#sec-progresso'), txt = $('#sec-texto');
+      if (etapa === 'especies') {
+        secProgresso = 'resolvendo nomes: ' + feitas + ' de ' + total;
+        if (barra) barra.style.width = (total ? feitas / total * 100 : 0) + '%';
+      } else if (etapa === 'ocorrencias') {
+        secProgresso = 'contando ocorrências na área…';
+      }
+      if (txt) txt.textContent = secProgresso;
+    }, function () { return secCancelar; }).then(function (res) {
+      secRodando = false;
+      if (!res.ok) {
+        renderSecundarios();
+        toast(res.offline
+          ? 'Sem conexão com a GBIF. O resto do app continua funcionando; a busca fica para depois.'
+          : ('Falha na busca: ' + res.erro));
+        return;
+      }
+      A.atualizarProjeto(at.projeto.id, { secundariosGbif: res });
+      estado = A.obter();
+      renderSecundarios();
+      toast(fmt(res.ocorrencias, 0) + ' ocorrências e ' + res.especies.length +
+        ' espécies na área' + (res.doCache ? ' (do cache)' : '') + '.');
+    }).catch(function (e) {
+      secRodando = false;
+      renderSecundarios();
+      toast('Falha na busca: ' + e.message);
+    });
+  }
+
+  /* =======================================================================
+     TELA 7 — RESULTADOS
      ==================================================================== */
   var escopo = 'projeto';   // 'projeto' | id da campanha
 
@@ -1912,9 +2725,57 @@
               }).join('') + '</tr>';
           }).join('') + '</tbody></table></div>';
       }).join('') : '<div class="grafico-vazio">Nenhuma espécie ameaçada, endêmica, migratória, cinegética ou exótica entre as registradas.</div>') +
+      cruzamentoOficialHtml(registrados) +
+      /* os avisos são constantes nossas e já trazem marcação — escapar aqui
+         mostraria as tags na tela */
       '<div style="margin-top:var(--e4)" class="avisos-pilha">' +
-      D.AVISOS_LEGAIS.map(function (a) { return avisoHtml(esc(a)); }).join('') + '</div>' +
+      D.AVISOS_LEGAIS.map(function (a) { return avisoHtml(a); }).join('') + '</div>' +
       '</div>';
+  }
+
+  /**
+   * O cruzamento com a Lista Nacional, do jeito que precisa aparecer em
+   * Resultados: o número que o catálogo declara contra o número que a lista
+   * oficial diz. Foi exatamente aqui que a planilha de origem errou —
+   * declarava "Ameaçada BR: 0" com uma espécie VU na lista.
+   */
+  function cruzamentoOficialHtml(registrados) {
+    if (!AE || !LO) return '';
+    var cr = AE.cruzarListaOficial(registrados);
+    var declaradas = registrados.filter(function (t) {
+      return D.ehAmeaca((t.atributos || {}).listaNacional);
+    }).length;
+    var oficiais = cr.ameacadasOficial.length;
+    if (!cr.naLista.length && !declaradas) return '';
+
+    var h = '<h3 style="margin-top:var(--e5);margin-bottom:var(--e2)">Conferência contra a Lista Nacional</h3>';
+
+    if (declaradas !== oficiais) {
+      h += avisoHtml('<strong>Divergência: o catálogo declara ' + declaradas +
+        ' espécie(s) ameaçada(s) na Portaria do MMA e a lista oficial aponta ' + oficiais + '.</strong> ' +
+        'Resolva em <strong>Táxons</strong> antes de gerar o laudo — número errado de espécie ameaçada ' +
+        'em documento oficial é passivo.');
+    } else if (oficiais) {
+      h += avisoHtml('O catálogo e a lista oficial concordam: ' + oficiais +
+        ' espécie(s) ameaçada(s) na Portaria do MMA.', 'info');
+    }
+
+    if (cr.naLista.length) {
+      h += '<div class="tabela-envolve" style="margin-top:var(--e3)"><table class="tabela"><thead><tr>' +
+        '<th class="esq">Espécie</th><th class="esq">Catálogo</th><th class="esq">Lista oficial</th>' +
+        '<th class="esq">Situação</th></tr></thead><tbody>' +
+        cr.naLista.map(function (x) {
+          return '<tr><td class="esq">' + nomeHtml(x.taxon) + '</td>' +
+            '<td class="esq">' + (x.atual ? esc(x.atual) : '<span style="color:var(--texto-3)">—</span>') + '</td>' +
+            '<td class="esq">' + (x.oficial ? esc(x.oficial.categoria) + ' <span style="color:var(--texto-3);font-size:.8rem">(' +
+              x.oficial.ano + ')</span>' : '—') + '</td>' +
+            '<td class="esq"><span class="tag' + (x.grave ? ' tag-terra' : ' tag-verde') + '">' +
+            esc({ confere: 'confere', faltando: 'falta preencher', diferente: 'diverge',
+              subespecie: 'só a subespécie consta', naoConsta: 'não consta' }[x.situacao] || x.situacao) +
+            '</span></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    return h;
   }
 
   function cardComparacoes(p, mapaTx) {
@@ -1938,8 +2799,32 @@
         });
       });
     });
+    /* GBIF: o levantamento secundário da região inteira */
+    var sg = p.secundariosGbif;
+    if (sg && sg.especies && sg.especies.length) {
+      var cz = SEC.cruzar(prim, sg.especies);
+      var f = sg.filtro || {};
+      h += '<div class="card"><div class="card-titulo"><h2>Primários × secundários (GBIF)</h2>' +
+        '<a class="btn btn-sec btn-pq" href="#secundarios">Abrir a tela</a></div>' +
+        '<p class="card-nota" style="margin-bottom:var(--e3)">Ocorrências publicadas num raio de ' +
+        fmt(f.raioKm, 0) + ' km em volta de ' + esc(f.lat) + ', ' + esc(f.lon) +
+        ((f.classes || []).length ? ' · classe ' + esc(f.classes.join(' + ')) : '') +
+        ' · consultado em ' + esc(dataHoraBR(sg.consultadoEm)) + '.</p>' +
+        '<div class="painel-num">' +
+        numCx(fmt(cz.soPrimario.length, 0), 'só no primário') +
+        numCx(fmt(cz.comuns.length, 0), 'em comum') +
+        numCx(fmt(cz.esperadas.length, 0), 'esperadas não detectadas', '', cz.esperadas.length > 0) +
+        numCx(pct(cz.cobertura, 0), 'cobertura da região') +
+        '</div>' +
+        '<div class="grade grade-2" style="margin-top:var(--e4)">' +
+        blocoEspecies('Exclusivas do primário', cz.soPrimario.map(function (e) { return e.nome; })) +
+        blocoEspecies('Esperadas para a região e não detectadas (as 40 mais registradas)',
+          cz.esperadas.slice(0, 40).map(function (e) { return e.nome; })) +
+        '</div></div>';
+    }
+
     var titulo = (p.secundarios && p.secundarios.titulo) || '';
-    h += '<div class="card"><div class="card-titulo"><h2>Dados primários × secundários</h2>' +
+    h += '<div class="card"><div class="card-titulo"><h2>Dados primários × secundários (lista digitada)</h2>' +
       '<button class="btn btn-sec btn-pq" data-acao="editar-secundarios" type="button">' + icone('ico-lapis') + ' Editar lista</button></div>' +
       (titulo ? '<p class="card-nota" style="margin-bottom:var(--e3)">Fonte secundária: <strong>' + esc(titulo) + '</strong>' +
         ((p.secundarios.autores) ? ' — ' + esc(p.secundarios.autores) : '') + '</p>' : '') +
@@ -2190,7 +3075,12 @@
       '</section>' +
 
       '<section><h2>Guilda trófica</h2>' +
-      G.rosca(M.composicao(dados.total, mapaTx, function (t) { return D.rotuloAtributo('dieta', (t.atributos || {}).dieta); }), { campo: 'especies' }) +
+      /* O grupo importa: sem ele, `rotuloAtributo` cai no domínio de 'todos',
+         que não tem nectarívora nem granívora — e o laudo saía com "nec" e
+         "gra" crus na legenda da rosca. */
+      G.rosca(M.composicao(dados.total, mapaTx, function (t) {
+        return D.rotuloAtributo('dieta', (t.atributos || {}).dieta, t.grupo || p.grupo);
+      }), { campo: 'especies' }) +
       '</section>' +
 
       '<section><h2>Espécies de interesse</h2>' +
@@ -2215,8 +3105,13 @@
         : '<p>Não foram registradas espécies ameaçadas, endêmicas, migratórias, cinegéticas ou exóticas.</p>') +
       '</section>' +
 
+      secaoLaudoListaOficial(registrados) +
+      secaoLaudoSecundarios(p, mapaTx) +
+
       '<section><h2>Tabela de espécies</h2>' +
       tabelaLaudoEspecies(dados.total, mapaTx, rel, freq, inc, p.grupo) + '</section>' +
+
+      secaoLaudoProcedencia(registrados, p) +
 
       '<section><h2>Notas metodológicas</h2>' +
       '<p style="font-size:.82rem;line-height:1.6;color:var(--texto-2)">' +
@@ -2242,6 +3137,133 @@
 
   function ficha(rotulo, valor) {
     return '<div><dt>' + esc(rotulo) + '</dt><dd>' + esc(valor || '—') + '</dd></div>';
+  }
+
+  /* ------------------------------------------------- seções novas do laudo */
+
+  /**
+   * A conferência contra a Lista Nacional, no laudo. Sai SEMPRE que houver
+   * espécie na lista — inclusive dizendo que confere, porque afirmar que
+   * conferiu é parte do que ele assina.
+   */
+  function secaoLaudoListaOficial(registrados) {
+    if (!AE || !LO) return '';
+    var cr = AE.cruzarListaOficial(registrados);
+    var declaradas = registrados.filter(function (t) {
+      return D.ehAmeaca((t.atributos || {}).listaNacional);
+    }).length;
+    var oficiais = cr.ameacadasOficial.length;
+    if (!cr.naLista.length && !declaradas) return '';
+
+    var h = '<section><h2>Conferência contra a Lista Nacional</h2>';
+
+    if (declaradas !== oficiais) {
+      h += '<p style="font-size:.86rem;line-height:1.6"><strong>Divergência não resolvida:</strong> a tabela ' +
+        'de espécies deste laudo declara ' + declaradas + ' espécie(s) ameaçada(s) na Portaria do MMA, ' +
+        'e o cruzamento com a lista oficial aponta ' + oficiais + '.</p>';
+    }
+
+    h += '<div class="tabela-envolve"><table class="tabela"><thead><tr>' +
+      '<th class="esq">Espécie</th><th class="esq">Família</th><th class="esq">Neste laudo</th>' +
+      '<th class="esq">Lista oficial</th><th class="esq">Situação</th></tr></thead><tbody>' +
+      cr.naLista.map(function (x) {
+        return '<tr><td class="esq">' + nomeHtml(x.taxon) + '</td>' +
+          '<td class="esq taxon-sup">' + esc(x.taxon.familia || (x.oficial && x.oficial.familia) || '—') + '</td>' +
+          '<td class="esq">' + esc(x.atual || '—') + '</td>' +
+          '<td class="esq">' + esc(x.oficial ? x.oficial.categoria + ' (' + x.oficial.ano + ')' : '—') + '</td>' +
+          '<td class="esq">' + esc({
+            confere: 'confere', faltando: 'não declarada no laudo', diferente: 'diverge',
+            subespecie: 'a lista traz só subespécie', naoConsta: 'não consta da lista'
+          }[x.situacao] || x.situacao) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="fonte" style="margin-top:8px">Fonte: ' + esc(LO.FONTE.nome) + ' — ' +
+      esc(LO.FONTE.orgao) + ', via ' + esc(LO.FONTE.portal) + ' (' + esc(LO.FONTE.taxons) +
+      ' táxons, licença ' + esc(LO.FONTE.licenca) + '), consultada em ' +
+      esc(dataBR(LO.FONTE.convertidoEm)) + '. <strong>' + esc(LO.FONTE.limitacao) + '</strong> ' +
+      esc(LO.ESTADUAIS.nota) + '</p></section>';
+    return h;
+  }
+
+  /** Primários × secundários da GBIF — com o filtro citado, senão não vale. */
+  function secaoLaudoSecundarios(p, mapaTx) {
+    var sg = p.secundariosGbif;
+    if (!sg || !sg.especies || !sg.especies.length) return '';
+    var prim = [];
+    (p.campanhas || []).forEach(function (c) {
+      (c.unidades || []).forEach(function (u) {
+        (u.registros || []).forEach(function (r) {
+          var t = mapaTx[r.taxonId];
+          if (t) prim.push(M.nomeCientifico(t));
+        });
+      });
+    });
+    var cz = SEC.cruzar(prim, sg.especies);
+    var f = sg.filtro || {};
+
+    return '<section><h2>Dados primários × secundários</h2>' +
+      '<div class="painel-num">' +
+      numCx(fmt(cz.riquezaPrimaria, 0), 'espécies em campo') +
+      numCx(fmt(cz.riquezaSecundaria, 0), 'espécies na região') +
+      numCx(fmt(cz.soPrimario.length, 0), 'só no primário') +
+      numCx(fmt(cz.comuns.length, 0), 'em comum') +
+      numCx(fmt(cz.esperadas.length, 0), 'não detectadas') +
+      numCx(pct(cz.cobertura, 0), 'cobertura') +
+      '</div>' +
+      '<h3 style="margin-top:var(--e4)">Exclusivas do levantamento primário (' + cz.soPrimario.length + ')</h3>' +
+      '<p style="line-height:1.9;font-size:.84rem">' + (cz.soPrimario.length
+        ? cz.soPrimario.map(function (e) { return '<i class="cientifico">' + esc(e.nome) + '</i>'; }).join(' · ')
+        : 'Nenhuma.') + '</p>' +
+      '<h3 style="margin-top:var(--e4)">Esperadas para a região e não detectadas (' + cz.esperadas.length + ')</h3>' +
+      '<p style="line-height:1.9;font-size:.84rem">' + (cz.esperadas.length
+        ? cz.esperadas.slice(0, 60).map(function (e) { return '<i class="cientifico">' + esc(e.nome) + '</i>'; }).join(' · ') +
+          (cz.esperadas.length > 60 ? ' <span style="color:var(--texto-3)">… e mais ' + (cz.esperadas.length - 60) + '</span>' : '')
+        : 'Nenhuma.') + '</p>' +
+      '<p class="fonte" style="margin-top:8px">Fonte: ' + esc(sg.fonte) + '. Filtro: geoDistance ' +
+      esc(f.lat) + ', ' + esc(f.lon) + ', ' + esc(f.raioKm) + ' km' +
+      ((f.classes || []).length ? ' · classe ' + esc(f.classes.join(' + ')) +
+        ' (taxonKey ' + esc((f.taxonKeys || []).join(', ')) + ')' : '') +
+      ' · hasCoordinate=true · ' + fmt(sg.ocorrencias, 0) + ' ocorrências. Consultado em ' +
+      esc(dataHoraBR(sg.consultadoEm)) + '.</p></section>';
+  }
+
+  /**
+   * De onde veio cada dado. É o que permite ao responsável técnico responder
+   * pela origem de cada número que ele assina — e é a diferença entre um
+   * campo preenchido por uma API e um campo preenchido por ninguém.
+   */
+  function secaoLaudoProcedencia(registrados, p) {
+    if (!AE) return '';
+    var fontes = AE.fontesUsadas(registrados);
+    var origem = p.origemDados;
+    if (!fontes.length && !origem && !p.secundariosGbif) return '';
+
+    var h = '<section><h2>Procedência dos dados</h2>';
+
+    if (origem) {
+      h += '<p style="font-size:.84rem;line-height:1.6">Os registros deste levantamento entraram por ' +
+        esc(origem.via === 'API' ? 'consulta à API' : 'importação de arquivo') + ': <strong>' +
+        esc(origem.fonte) + '</strong>, em ' + esc(dataHoraBR(origem.consultadoEm)) + '.</p>';
+    }
+
+    if (fontes.length) {
+      h += '<div class="tabela-envolve" style="margin-top:var(--e3)"><table class="tabela"><thead><tr>' +
+        '<th class="esq">Fonte</th><th>Campos aceitos</th><th>Espécies</th>' +
+        '<th class="esq">Consulta mais antiga</th><th class="esq">Mais recente</th></tr></thead><tbody>' +
+        fontes.map(function (f) {
+          return '<tr><td class="esq">' + esc(f.fonte) + '</td>' +
+            '<td>' + fmt(f.campos, 0) + '</td><td>' + fmt(f.taxons, 0) + '</td>' +
+            '<td class="esq">' + esc(dataBR(f.primeira)) + '</td>' +
+            '<td class="esq">' + esc(dataBR(f.ultima)) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' +
+        '<p class="fonte" style="margin-top:8px">Cada campo da tabela acima foi <strong>proposto</strong> pela ' +
+        'fonte indicada e <strong>aceito individualmente</strong> pelo responsável técnico. Nenhum valor foi ' +
+        'gravado automaticamente, e nenhum campo já preenchido foi sobrescrito sem decisão expressa.</p>';
+    } else {
+      h += '<p style="font-size:.84rem;line-height:1.6">Nenhum campo de autoecologia foi preenchido a partir ' +
+        'de fonte externa: todos foram digitados pelo responsável técnico.</p>';
+    }
+
+    return h + '</section>';
   }
 
   function tabelaLaudoEspecies(mapa, mapaTx, rel, freq, inc, grupo) {
@@ -2305,6 +3327,7 @@
     $('#btn-nova-unidade').addEventListener('click', novaUnidade);
     $('#btn-novo-taxon').addEventListener('click', novoTaxon);
     $('#btn-gbif-lote').addEventListener('click', verificarLote);
+    $('#btn-auto-lote').addEventListener('click', autoLote);
     $('#btn-ir-laudo').addEventListener('click', function () { location.hash = '#laudo'; });
     $('#btn-imprimir').addEventListener('click', function () { window.print(); });
 
@@ -2483,6 +3506,28 @@
 
       case 'div-aceitar': aplicarDivergencia(idT, Number(el.getAttribute('data-i')), true); break;
       case 'div-recusar': aplicarDivergencia(idT, Number(el.getAttribute('data-i')), false); break;
+
+      /* autoecologia automática */
+      case 'auto-um': autoUm(idT); break;
+      case 'auto-lote': autoLote(); break;
+      case 'sug-aceitar': decidirSugestao(idT, Number(el.getAttribute('data-i')), true); break;
+      case 'sug-recusar': decidirSugestao(idT, Number(el.getAttribute('data-i')), false); break;
+      case 'auto-aceitar-vazios': decidirEmLote(['preenche'], true); break;
+      case 'auto-aceitar-grafia': decidirEmLote(['grafia'], true); break;
+      case 'auto-aceitar-todos': decidirEmLote(['preenche', 'diverge', 'grafia'], true); break;
+      case 'auto-recusar-todos': decidirEmLote(['preenche', 'diverge', 'grafia', 'atencao'], false); break;
+
+      /* lista oficial */
+      case 'lo-aceitar': decidirListaOficial(idT, true); break;
+      case 'lo-recusar': decidirListaOficial(idT, false); break;
+
+      /* dados secundários */
+      case 'sec-buscar': buscarSecundarios(false); break;
+      case 'sec-atualizar': buscarSecundarios(true); break;
+
+      /* importação de observações externas */
+      case 'import-inat': fecharModal(); modalInaturalist(); break;
+      case 'import-ebird': fecharModal(); modalEbird(); break;
 
       case 'atalho': lancarAtalho(idT); break;
 

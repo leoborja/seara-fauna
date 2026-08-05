@@ -36,6 +36,10 @@
     <symbol id="ico-globo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.8 3.8 9S14.5 21.3 12 21c-2.5-2.7-3.8-5.8-3.8-9S9.5 5.7 12 3z"/></symbol>
     <symbol id="ico-lupa" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></symbol>
     <symbol id="ico-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+    <!-- varinha: o preenchimento automático da autoecologia -->
+    <symbol id="ico-varinha" viewBox="0 0 24 24"><path d="M4 20 15 9"/><path d="m17.5 3.2.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z"/><path d="M6.2 4.2 6.8 5.8l1.6.6-1.6.6-.6 1.6-.6-1.6L4 6.4l1.6-.6z"/></symbol>
+    <!-- pilha: a lista oficial embutida -->
+    <symbol id="ico-lista" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6v.1M4.5 12v.1M4.5 18v.1"/></symbol>
     <!-- Marca da tela vazia: um pássaro sobre o galho, na paleta da casa. -->
     <symbol id="ico-fauna" viewBox="0 0 96 96">
       <path d="M14 78h68" stroke="#B4633A" stroke-width="5" stroke-linecap="round" fill="none"/>
@@ -63,6 +67,7 @@
       <a href="#unidades">Unidades</a>
       <a href="#registros">Registros</a>
       <a href="#taxons">Táxons</a>
+      <a href="#secundarios">Secundários</a>
       <a href="#resultados">Resultados</a>
       <a href="#laudo">Laudo</a>
       <a href="#ajuda" title="Como usar a ferramenta">Como usar</a>
@@ -147,10 +152,23 @@
       <div class="acoes">
         <button class="btn btn-sec" id="btn-csv-taxons" type="button"><svg><use href="#ico-baixar"></use></svg> Exportar CSV</button>
         <button class="btn btn-sec" id="btn-gbif-lote" type="button"><svg><use href="#ico-globo"></use></svg> Verificar na GBIF</button>
-        <button class="btn" id="btn-novo-taxon" type="button"><svg><use href="#ico-mais"></use></svg> Novo táxon</button>
+        <button class="btn" id="btn-auto-lote" type="button"><svg><use href="#ico-varinha"></use></svg> Preencher autoecologia</button>
+        <button class="btn btn-sec" id="btn-novo-taxon" type="button"><svg><use href="#ico-mais"></use></svg> Novo táxon</button>
       </div>
     </div>
     <div id="taxons-conteudo"></div>
+  </section>
+
+  <!-- ========================= 6. DADOS SECUNDÁRIOS ======================= -->
+  <section class="tela" id="tela-secundarios" aria-labelledby="t-secundarios">
+    <div class="tela-cabec">
+      <div>
+        <h1 id="t-secundarios">Dados secundários</h1>
+        <p id="sub-secundarios">O que a literatura já registrou na região, direto da GBIF — e o que
+        o levantamento de campo achou, ou deixou de achar.</p>
+      </div>
+    </div>
+    <div id="secundarios-conteudo"></div>
   </section>
 
   <!-- =========================== 6. RESULTADOS =========================== -->
@@ -194,7 +212,7 @@
 
       <section class="cartao">
         <h2>O fluxo, do começo ao fim</h2>
-        <p>São seis passos, sempre na mesma ordem. Cada um só faz sentido depois do anterior.</p>
+        <p>São sete passos, sempre na mesma ordem. Cada um só faz sentido depois do anterior.</p>
         <ol class="passos">
           <li>
             <span class="passo-n">1</span>
@@ -250,11 +268,25 @@
               <p>O catálogo de espécies com IUCN, Portaria do MMA, lista estadual, sensibilidade,
               endemismo, dependência de mata, hábitat, guilda trófica, migratória, cinegética e
               exótica. É daqui que sai a <em>tabela para laudo</em>.</p>
-              <p>E é aqui que fica o botão <strong>Verificar na GBIF</strong> — veja o quadro abaixo.</p>
+              <p>É aqui que ficam os dois botões que poupam mais tempo:
+              <strong>Preencher autoecologia</strong> e <strong>Verificar na GBIF</strong> —
+              veja os quadros abaixo.</p>
             </div>
           </li>
           <li>
             <span class="passo-n">6</span>
+            <div>
+              <h3>Dados secundários</h3>
+              <p>Um ponto, um raio e o grupo do projeto: o app traz da GBIF <strong>tudo o que já
+              foi publicado naquela área</strong> e cruza com o seu levantamento. Sai em três
+              listas — <strong>exclusivas do seu campo</strong>, <strong>em comum</strong> e
+              <strong>esperadas para a região e não detectadas</strong>.</p>
+              <p class="dica">É esta terceira que dá argumento ao laudo: ou o esforço foi curto,
+              ou a espécie deixou a área. A conclusão é sua; o app só entrega o número e a fonte.</p>
+            </div>
+          </li>
+          <li>
+            <span class="passo-n">7</span>
             <div>
               <h3>Resultados e laudo</h3>
               <p>Índices por unidade e por campanha, estimadores de riqueza com intervalo de
@@ -371,6 +403,101 @@
       </section>
 
       <section class="cartao">
+        <h2>A autoecologia com um clique</h2>
+        <p>Antes, a autoecologia era digitada <strong>espécie por espécie</strong>. O botão
+        <strong>Preencher autoecologia</strong> consulta quatro fontes de uma vez e propõe o
+        preenchimento — em lote, ou espécie a espécie pela varinha na linha da tabela.</p>
+        <div class="formulas">
+          <div><b>GBIF <code>species/match</code></b> <code>reino · filo · classe · ordem · família · gênero · autor e ano · chave</code></div>
+          <div><b>GBIF <code>vernacularNames</code></b> <code>nome comum em português</code></div>
+          <div><b>iNaturalist <code>taxa</code></b> <code>categoria de conservação · nome comum pt-BR</code></div>
+          <div><b>Lista Nacional embutida</b> <code>categoria da Portaria do MMA — sem internet</code></div>
+        </div>
+        <p style="margin-top:var(--e3)"><strong>A máquina propõe, você decide.</strong> A tela de
+        revisão mostra, campo a campo, o <em>valor atual</em>, o <em>valor proposto</em> e a
+        <em>fonte com a data da consulta</em>. Você aceita ou recusa um a um, ou usa
+        <em>Aceitar os campos em branco</em>, <em>Adotar a grafia das fontes</em> e
+        <em>Aceitar todos</em>.</p>
+        <p><strong>Campo que você já preencheu nunca é sobrescrito sem você mandar.</strong>
+        Preencher um vazio e mudar o que você escreveu são coisas diferentes, e a tela trata
+        como coisas diferentes.</p>
+        <h3>O que fica sempre para decisão individual</h3>
+        <ul class="lista-aviso">
+          <li><strong>Troca de gênero.</strong> O nome científico é gênero + epíteto: aceitar em
+          lote renomearia a espécie sem você perceber. Isso é decisão de nomenclatura e se
+          resolve pela <em>Conferência taxonômica</em>, que guarda o nome antigo como sinônimo.</li>
+          <li><strong>Categoria de conservação que não é da IUCN.</strong> Nem todo status do
+          iNaturalist vem da Lista Vermelha — muitos são listas regionais. Quando não é IUCN, o
+          app diz de quem é e <strong>não</strong> propõe preencher a coluna IUCN.</li>
+          <li><strong>Espécie que a lista oficial só traz como subespécie.</strong> Ver o quadro
+          seguinte.</li>
+        </ul>
+        <h3>Silêncio de fonte não é dado</h3>
+        <p>O iNaturalist só publica a categoria de conservação de quem <em>não</em> é “pouco
+        preocupante”. <strong>Voltar sem categoria não quer dizer LC</strong> — quer dizer que
+        não há registro. O app conta quantas espécies ficaram assim e avisa; se o laudo precisa
+        da coluna IUCN preenchida, ela vai ter que ser digitada.</p>
+        <h3>De onde veio cada dado</h3>
+        <p>Todo valor aceito guarda a <strong>fonte</strong>, a <strong>data da consulta</strong>
+        e a <strong>data em que você aceitou</strong>. O laudo traz a seção
+        <em>Procedência dos dados</em> com uma linha por fonte. É o que permite responder de onde
+        saiu cada número que você assina.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>A Lista Nacional embutida</h2>
+        <p>O app traz <strong>dentro dele</strong> os 1.407 táxons da Lista Nacional de Espécies
+        da Fauna Ameaçadas de Extinção — dados abertos do Ministério do Meio Ambiente, licença
+        Creative Commons Atribuição. <strong>O cruzamento funciona sem internet</strong> e roda
+        sozinho: toda vez que a tela de Táxons abre, todo o catálogo é conferido.</p>
+        <p>Ele compara <strong>quantas espécies você declarou ameaçadas</strong> na coluna
+        Portaria do MMA com <strong>quantas a lista oficial aponta</strong>. Quando os dois
+        números não batem, o aviso vem em terracota: laudo que informa o número errado de
+        espécies ameaçadas é passivo.</p>
+        <h3>Duas coisas que você precisa saber</h3>
+        <ul class="lista-aviso">
+          <li>A lista embutida é o documento de <strong>reavaliação de 2021</strong> —
+          <strong>não</strong> é o anexo literal da <strong>Portaria MMA nº 148/2022</strong>,
+          que é o ato com força legal e substituiu a 444/2014. Use como triagem e
+          <strong>confira contra a portaria antes de assinar</strong>.</li>
+          <li><strong>Nenhuma lista estadual está embutida.</strong> Não existe versão legível
+          por máquina da Deliberação Normativa COPAM 147/2010 (MG) nem das demais. A coluna
+          <em>Lista estadual</em> continua sendo preenchida por você, à mão — o app prefere
+          faltar o dado a inventá-lo.</li>
+        </ul>
+        <h3>Quando a lista traz só a subespécie</h3>
+        <p>A lista protege, em alguns casos, <strong>subespécies</strong> e não a espécie
+        inteira. A diferença é jurídica: preencher a espécie com a categoria da subespécie põe
+        no laudo uma afirmação que a portaria não faz. O app mostra <em>quais</em> subespécies
+        são, <strong>não conta a espécie como ameaçada</strong>, e deixa a decisão com você.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Trazendo o eBird e o iNaturalist</h2>
+        <p>Os dois entram por <strong>Projetos → Importar dados</strong> e caem na mesma tela de
+        pré-visualização das planilhas: você vê o que vai entrar antes de entrar, e
+        <strong>espécie que já está no catálogo é reaproveitada, nunca duplicada</strong>.</p>
+        <div class="ajuda-grade">
+          <div>
+            <h3>iNaturalist</h3>
+            <p>Sem chave e sem cadastro. Você informa o <strong>usuário</strong> e, se quiser, um
+            recorte de datas. Entra espécie, data, hora, coordenada e local.</p>
+            <p class="dica">Observação identificada só em gênero ou família é separada e não
+            entra — contá-la inflaria a riqueza.</p>
+          </div>
+          <div>
+            <h3>eBird</h3>
+            <p>Precisa de uma <strong>chave de API gratuita</strong>, que sai em minutos em
+            <code>ebird.org/api/keygen</code>. Ela fica guardada <strong>neste aparelho</strong>,
+            nunca no backup exportado.</p>
+            <p class="dica"><strong>Sem chave o app funciona igual</strong> — só o eBird fica de
+            fora. A eBird não publica “minhas observações”: o que existe é por área, até 50 km e
+            30 dias. Trate como dado de apoio.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="cartao">
         <h2>A verificação na GBIF</h2>
         <p>A GBIF é a base taxonômica internacional. O app consulta
         <code>api.gbif.org/v1/species/match</code> — sem chave, sem cadastro, de graça — e compara o
@@ -427,13 +554,19 @@
       <section class="cartao">
         <h2>Antes de assinar</h2>
         <ul class="lista-aviso">
-          <li><strong>A Portaria MMA 444/2014 foi substituída pela 148/2022.</strong> A planilha
-          antiga usava a 444. Lista desatualizada em laudo oficial é passivo — confira qual é a
-          vigente antes de entregar.</li>
+          <li><strong>A lista embutida é a reavaliação de 2021, não a Portaria 148/2022.</strong>
+          O app cruza sozinho e aponta divergência, mas o ato com força legal é a portaria — que
+          substituiu a 444/2014 usada na planilha antiga. Confira antes de entregar.</li>
+          <li><strong>Nenhuma lista estadual está embutida.</strong> A coluna continua manual: não
+          há fonte legível por máquina da COPAM 147/2010 nem das demais.</li>
           <li><strong>A API da IUCN proíbe uso comercial</strong>, e consultoria remunerada é uso
           comercial (a alternativa deles, o IBAT, é paga). Por isso o app não consulta a IUCN: a
-          categoria é digitada por você, como referência. As listas com <strong>força legal</strong>
-          no laudo brasileiro são a Portaria do MMA e a estadual — atos normativos públicos.</li>
+          categoria chega pelo iNaturalist, sempre com a autoridade declarada, ou é digitada por
+          você. As listas com <strong>força legal</strong> no laudo brasileiro são a Portaria do
+          MMA e a estadual — atos normativos públicos.</li>
+          <li><strong>A comparação com os dados secundários é por nome científico.</strong>
+          Sinônimo não resolvido no catálogo aparece como “exclusivo do primário” parecendo
+          achado. Rode a Conferência taxonômica antes de levar essa lista para o laudo.</li>
           <li><strong>Sem esforço não há densidade.</strong> Unidade sem esforço preenchido aparece
           marcada em terracota e fica de fora dos cálculos que dependem dele. O app prefere avisar a
           devolver um número sem sentido.</li>
@@ -451,6 +584,11 @@
         <p><strong>A consequência disso:</strong> os dados não passam do celular para o computador
         sozinhos, e limpar os dados de navegação apaga tudo. Exporte o <strong>JSON</strong> de tempos
         em tempos na tela de Projetos — é o seu backup, e é ele que leva os dados de um aparelho ao outro.</p>
+        <p>Toda consulta feita a uma fonte externa também fica <strong>guardada com a data</strong>.
+        Consulta repetida não sai de novo para a rede, e o que já foi consultado continua aparecendo
+        sem internet — sempre dizendo <em>quando</em> foi consultado, para você saber se está velho.</p>
+        <p class="dica">A chave do eBird fica guardada à parte e <strong>não entra no backup
+        JSON</strong>. Ao trocar de aparelho, informe-a de novo.</p>
       </section>
 
     </div>
@@ -476,6 +614,12 @@
 <script src="js/motor.js"></script>
 <script src="js/graficos.js"></script>
 <script src="js/gbif.js"></script>
+<!-- Lista Nacional embutida: cruzamento offline, é consulta pura.
+     Tem que vir antes de autoecologia.js, que a usa. -->
+<script src="js/listas-oficiais.js"></script>
+<script src="js/fontes.js"></script>
+<script src="js/autoecologia.js"></script>
+<script src="js/secundarios.js"></script>
 <script src="js/exemplos.js"></script>
 <script src="js/armazenamento.js"></script>
 <script src="js/importador.js"></script>

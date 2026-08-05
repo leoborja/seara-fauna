@@ -180,6 +180,42 @@ Testadas nesta máquina em 04/08/2026 contra as 59 espécies reais:
 O que a GBIF devolve: `usageKey · scientificName · canonicalName · rank · status
 (ACCEPTED/SYNONYM) · confidence · matchType · kingdom → species · family`.
 
+> **Como foi implementado** (nota posterior à especificação): a hierarquia
+> completa que a GBIF já devolvia era **descartada**. Passou a alimentar o
+> preenchimento automático da autoecologia, junto de mais três fontes:
+>
+> | Fonte | O que traz |
+> |---|---|
+> | `species/match` | reino → gênero, autoria, ano, `usageKey` |
+> | `species/{key}/vernacularNames` | nome comum, filtrando `language: "por"` |
+> | `api.inaturalist.org/v1/taxa` | categoria de conservação e nome comum `pt-BR` |
+> | Lista Nacional embutida (§6) | categoria da Portaria — **offline** |
+>
+> A regra de ouro vale para todas: cada campo vira uma proposta com **valor
+> atual × valor proposto × fonte × data da consulta**, e o responsável técnico
+> aceita ou recusa uma a uma, ou em lote. Campo já preenchido nunca é
+> sobrescrito sem ordem expressa; a diferença entre "campo em branco" e
+> "diverge do que você preencheu" é explícita na tela. Todo valor aceito grava
+> `procedencia` (fonte, `consultadoEm`, `aceitoEm`), que sai numa seção própria
+> do laudo.
+>
+> Três classes de proposta nascem fora de qualquer ação em lote: **troca de
+> gênero** (mudaria o nome científico), **categoria cuja autoridade não é a
+> IUCN** (o iNaturalist republica listas regionais também) e **espécie que a
+> lista oficial só traz como subespécie**.
+>
+> **Dados secundários** deixaram de ser uma referência digitada à mão:
+> `occurrence/search` com `geoDistance` e `facet=speciesKey` devolve tudo o que
+> foi publicado num raio, e o cruzamento sai em três listas — exclusivas do
+> primário, em comum, e **esperadas para a região mas não detectadas**. A chave
+> da classe é perguntada à GBIF (`species/match?rank=CLASS`), não cravada.
+>
+> **eBird e iNaturalist** entram pelo importador que já existia: viram tabela
+> Darwin Core e caem na tela de pré-visualização e mapeamento, que já
+> reaproveita táxon existente sem duplicar. A chave do eBird mora no
+> `localStorage` do aparelho — nunca no código — e sem ela só o eBird fica
+> indisponível.
+
 **Regra de ouro:** a API **sugere**, nunca sobrescreve. Toda divergência vira um
 aviso que o responsável técnico aceita ou recusa — a assinatura do laudo é dele.
 
@@ -229,6 +265,33 @@ eBird, iNaturalist e SiBBr.
    a alternativa deles é o IBAT, pago). As listas com força legal no laudo
    brasileiro são a **Portaria do MMA** e a **estadual** — atos normativos
    públicos, livres. Embutir essas; IUCN só como referência via GBIF/iNaturalist.
+
+> **Como foi implementado** (nota posterior à especificação): a lista nacional
+> está **embutida** em `js/listas-oficiais.js` — 1.407 táxons do Portal
+> Brasileiro de Dados Abertos (MMA, licença Creative Commons Atribuição),
+> convertidos do CSV por `gerar-listas.py`. O cruzamento é **offline** e roda
+> sozinho: é consulta pura.
+>
+> Duas limitações são declaradas na tela e no laudo, não escondidas:
+>
+> - O CSV é o documento de **reavaliação de 2021**, **não** o anexo literal da
+>   Portaria 148/2022. Serve como triagem; a conferência contra a portaria
+>   continua obrigatória.
+> - **Nenhuma lista estadual** foi encontrada em formato legível por máquina —
+>   nem a COPAM 147/2010 (MG). A estrutura (`LISTAS_OFICIAIS.ESTADUAIS`) está
+>   pronta e **vazia de propósito**; a coluna continua manual.
+>
+> O domínio de `listaNacional` ganhou `RE`, `EW` e `EX`, que a lista usa e que
+> o campo não sabia representar — uma espécie regionalmente extinta continua
+> **na** lista.
+>
+> **Caso de regressão fixado:** no exemplo de avifauna, `Amazona vinacea` é
+> `VU` na lista oficial com `listaNacional` vazio. O resumo da planilha de
+> origem declarava "Ameaçada BR: 0"; o correto é 1. O app compara os dois
+> números e aponta a divergência com destaque em Táxons, em Resultados e no
+> laudo. `Thamnophilus caerulescens`, que a lista traz apenas como duas
+> subespécies do Nordeste, é sinalizado **sem** ser contado como ameaçado — a
+> lista protege a subespécie, não a espécie.
 
 ---
 

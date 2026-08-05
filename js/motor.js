@@ -725,7 +725,10 @@
   /* =========================================================================
      6. ESPÉCIES DE INTERESSE
      ====================================================================== */
-  var AMEACA = ['VU', 'EN', 'CR'];
+  /* RE (regionalmente extinta), EW (extinta na natureza) e EX (extinta)
+     entram porque a Lista Nacional as usa: uma espécie extinta na área é
+     achado de laudo, não ausência de achado. Ver DADOS.AMEACA. */
+  var AMEACA = ['VU', 'EN', 'CR', 'RE', 'EW', 'EX'];
 
   /* A caixa das letras NÃO carrega significado nestas siglas de domínio
      fechado — a planilha do João traz 'vu' e 'VU', 'b' e 'B', na mesma

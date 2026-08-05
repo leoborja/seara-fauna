@@ -6,6 +6,18 @@ Substitui a planilha de 30 abas: modela N campanhas sem duplicar estrutura,
 o intervalo de confiança log-normal de Chao e a fonte de cada variância no
 próprio laudo — e confere a nomenclatura contra a GBIF.
 
+**A autoecologia não é mais digitada espécie por espécie.** Um botão consulta a
+GBIF (hierarquia completa, autoria, ano, nome comum em português), o
+iNaturalist (categoria de conservação) e a **Lista Nacional de Espécies
+Ameaçadas embutida** — que funciona sem internet — e propõe o preenchimento,
+campo a campo. Os dados secundários vêm da GBIF em vez de garimpo
+bibliográfico, e o eBird e o iNaturalist entram direto pela API.
+
+A regra que atravessa tudo: **a máquina propõe, o responsável técnico decide.**
+Nada é gravado sem ele aceitar, campo já preenchido nunca é sobrescrito sem
+ordem, e a origem de cada valor — fonte e data da consulta — fica gravada e sai
+no laudo. A assinatura é dele.
+
 Serve a **qualquer grupo da fauna e qualquer metodologia**: cada método declara
 a própria unidade de esforço e cada grupo, a própria autoecologia. Vem com dois
 exemplos completos, de grupos e métodos diferentes — avifauna em transecto (km)
@@ -48,20 +60,33 @@ requisição por CORS em `file://`).
 ## Arquivos
 
 ```
-index.html            8 telas + os símbolos SVG da marca
-testes.html           conferência numérica do motor contra exemplos publicados
-css/estilo.css        paleta verde-folha #1B5E3F + terracota #B4633A, claro e escuro
-js/dados.js           métodos e unidades de esforço, autoecologia POR GRUPO, avisos legais
-js/motor.js           índices, estimadores, variâncias, rarefação — funções puras
-js/graficos.js        curva do coletor, barras, roscas, dot-and-whisker — SVG à mão
-js/gbif.js            consulta e comparação com a GBIF
-js/exemplos.js        os dois projetos de demonstração (avifauna e mastofauna)
-js/importador.js      leitor genérico de CSV / TSV / Darwin Core
-js/armazenamento.js   localStorage, CRUD, export/import JSON e CSV
-js/app.js             interface e eventos
-assets/               marca, ícones, selo, favicon
-importar.py           conversor .xlsx → JSON do app
-exemplo-planalto.json planilha da Mineração — exemplo (Mariana/MG) já convertida
+index.html                9 telas + os símbolos SVG da marca
+testes.html               conferência numérica do motor contra exemplos publicados
+css/estilo.css            paleta verde-folha #1B5E3F + terracota #B4633A, claro e escuro
+js/dados.js               métodos e unidades de esforço, autoecologia POR GRUPO, avisos legais
+js/motor.js               índices, estimadores, variâncias, rarefação — funções puras
+js/graficos.js            curva do coletor, barras, roscas, dot-and-whisker — SVG à mão
+js/gbif.js                conferência do NOME contra a GBIF (species/match)
+js/listas-oficiais.js     Lista Nacional embutida — 1.407 táxons, GERADO, cruzamento offline
+js/fontes.js              camada de rede: GBIF, iNaturalist, eBird + cache no localStorage
+js/autoecologia.js        motor de propostas: o que cada fonte tem a dizer sobre um táxon
+js/secundarios.js         ocorrências da GBIF na região e o cruzamento das três listas
+js/exemplos.js            os dois projetos de demonstração (avifauna e mastofauna)
+js/importador.js          leitor genérico de CSV / TSV / Darwin Core
+js/armazenamento.js       localStorage, CRUD, export/import JSON e CSV
+js/app.js                 interface e eventos
+assets/                   marca, ícones, selo, favicon
+importar.py               conversor .xlsx → JSON do app
+gerar-listas.py           conversor do CSV do MMA → js/listas-oficiais.js
+dados/                    fauna-ameacada-2021.csv, a fonte da lista embutida
+exemplo-planalto.json     planilha da Mineração — exemplo (Mariana/MG) já convertida
+```
+
+`js/listas-oficiais.js` é **gerado** — não se edita à mão. Para regerar a
+partir do CSV do MMA:
+
+```bash
+python3 gerar-listas.py
 ```
 
 ## Os dois exemplos
@@ -86,7 +111,7 @@ campanhas.
 > Os dados de campo do exemplo de mastofauna são fictícios e as categorias de
 > ameaça são ilustrativas. O aviso está dentro do próprio projeto.
 
-## As 8 telas
+## As 9 telas
 
 | Tela | O que faz |
 |---|---|
@@ -94,7 +119,8 @@ campanhas.
 | **Campanhas** | N campanhas por projeto, com sazonalidade. Sem limite, sem duplicação |
 | **Unidades amostrais** | Método, código, geo, ambiente, condições e **esforço** |
 | **Registros** | Lançamento rápido: autocompletar de espécie, `Enter` salva e devolve o foco |
-| **Táxons / Autoecologia** | Catálogo com os atributos **do grupo escolhido** e o botão de verificar na GBIF |
+| **Táxons / Autoecologia** | Catálogo, **preenchimento automático da autoecologia**, cruzamento com a Lista Nacional e conferência do nome na GBIF |
+| **Secundários** | Ocorrências publicadas na região (GBIF) e o cruzamento com o levantamento de campo |
 | **Resultados** | Índices, estimadores, curva do coletor, composição, espécies de interesse |
 | **Laudo** | A4 imprimível, pronto para assinar |
 | **Como usar** | Fluxo, fórmulas, avisos |
@@ -331,10 +357,331 @@ Resultado do lote: **49 conferem, 11 divergentes, 0 não encontrados, 0 erros.**
 
 ---
 
+## Autoecologia com um clique
+
+Até a rodada anterior, a GBIF só resolvia o **nome**. Toda a autoecologia
+continuava sendo digitada espécie por espécie — e era a maior perda de tempo do
+trabalho. **Táxons → Preencher autoecologia** (em lote, ou pela varinha na
+linha de cada espécie) consulta quatro fontes e propõe o preenchimento:
+
+| Fonte | O que traz | Chave |
+|---|---|---|
+| GBIF `species/match` | reino, filo, classe, ordem, família, gênero, **autoria e ano**, `usageKey` | não precisa |
+| GBIF `species/{key}/vernacularNames` | **nome comum em português** (`language: "por"`) | não precisa |
+| iNaturalist `taxa` | **categoria de conservação** e nome comum `pt-BR` | não precisa |
+| Lista Nacional embutida | **categoria da Portaria do MMA** — **offline** | não precisa |
+
+A hierarquia completa já vinha na resposta da GBIF e o app **jogava fora**. Era
+o ganho mais barato da lista.
+
+### A tela de revisão
+
+Campo a campo: **valor atual × valor proposto × fonte e data da consulta**, com
+aceitar e recusar individuais e ações em lote. Cada proposta é classificada, e
+a classificação decide o que entra em cada botão:
+
+| Classe | O que é | Entra em "aceitar todos"? |
+|---|---|---|
+| `campo em branco` | não havia nada ali | sim, e tem botão próprio |
+| `diverge` | você preencheu uma coisa, a fonte diz outra | sim |
+| `mesmo nome, outra grafia` | *Papagaio de peito roxo* × *papagaio-de-peito-roxo* | sim, e tem botão próprio |
+| `atenção` | pede decisão individual (abaixo) | **não** |
+| `confere` | a fonte concorda com o que já está lá | não é pergunta, é confirmação |
+
+**Campo que o João já preencheu nunca é sobrescrito sem ele mandar.** A
+diferença entre "em branco" e "diverge" é justamente essa: preencher um vazio é
+uma decisão barata, mudar o que ele escreveu não é.
+
+Três coisas nascem como **atenção** e ficam fora de qualquer ação em lote:
+
+1. **Troca de gênero.** O nome científico é gênero + epíteto: aceitar em lote
+   renomearia a espécie caladamente. Isso é decisão de nomenclatura e se
+   resolve pela Conferência taxonômica, que registra o nome antigo como
+   sinônimo.
+2. **Categoria de conservação cuja autoridade não é a IUCN.** Nem todo
+   `conservation_status` do iNaturalist é da Lista Vermelha; muitos são listas
+   regionais. Quando não é IUCN, o app **diz de quem é** e não propõe preencher
+   a coluna IUCN.
+3. **Espécie que a lista oficial só traz como subespécie** (ver abaixo).
+
+### O que a grafia com hífen tem a ver com isso
+
+A GBIF republica os nomes comuns na forma do CBRO, com hífen
+(`papagaio-de-peito-roxo`). A planilha do João usa a forma sem hífen. São o
+**mesmo nome**: tratar isso como divergência encheria a tela de 45 decisões
+sobre hífen, que é exatamente o tipo de trabalho manual que esta rodada existe
+para acabar. Vira classe própria, com botão próprio.
+
+### O silêncio da fonte não é dado
+
+O iNaturalist **só publica `conservation_status` para quem não é "pouco
+preocupante"**. Traduzir essa ausência em `LC` seria inventar categoria de
+conservação no laudo. O app conta quantos táxons voltaram sem categoria e diz,
+na tela, que **ausência de resposta não quer dizer LC**.
+
+### Procedência
+
+Todo valor aceito grava em `taxon.procedencia[campo]`:
+
+```json
+{ "valor": "(Kuhl, 1820)",
+  "fonte": "GBIF · species/match",
+  "consultadoEm": "2026-08-05T13:44:20.150Z",
+  "aceitoEm":     "2026-08-05T13:49:54.563Z" }
+```
+
+O laudo ganha a seção **Procedência dos dados**, com uma linha por fonte:
+quantos campos vieram dela, em quantas espécies, e as datas da consulta mais
+antiga e da mais recente. É o que permite ao responsável técnico responder de
+onde saiu cada número que ele assina.
+
+### O que saiu nas 60 espécies do exemplo de avifauna
+
+Rodado em `http://localhost:8081/`, contra as APIs de verdade, em 05/08/2026 —
+69 s para os 60 táxons (3 chamadas por espécie, 120 ms de pausa entre elas):
+
+| Campo | em branco | diverge | grafia | confere |
+|---|---|---|---|---|
+| Reino, Filo, Classe | 0 | 0 | 0 | 60 cada |
+| Ordem | 0 | 2 | 0 | 58 |
+| Família | 0 | 4 | 0 | 56 |
+| Gênero | 0 | 3 *(→ atenção)* | 0 | 57 |
+| **Autor e ano** | **60** | 0 | 0 | 0 |
+| **Chave GBIF** | **60** | 0 | 0 | 0 |
+| Nome comum | 0 | 17 | 28 | 14 |
+| IUCN | 1 | 1 | 0 | 1 |
+| Portaria MMA | 1 | 0 | 0 | 0 |
+
+**513 propostas ao todo: 122 campos em branco a preencher, 24 divergências, 28
+de grafia, 4 de atenção e 366 confirmações.** Nenhuma fonte falhou; nenhum
+táxon ficou sem resposta.
+
+O que ficou **sem resposta**, e por quê:
+
+- **57 de 60 táxons sem categoria IUCN** — o iNaturalist não publica a
+  categoria de espécie "pouco preocupante", que é a maioria de uma avifauna
+  comum. A coluna IUCN continua manual para elas.
+- **1 táxon sem nome comum em português** (`Hydropsalis parvula`) — nem a GBIF
+  nem o iNaturalist têm um. É o mesmo táxon cujo nome aceito hoje é *Setopagis
+  parvula*; resolvida a sinonímia, o nome comum aparece.
+- **58 de 60 fora da Lista Nacional** — o esperado: a lista tem 280 aves, e
+  uma avifauna comum de Mata Atlântica quase não a toca.
+
+Aceitando só os campos em branco e a grafia, num clique cada: **60 autorias, 60
+chaves GBIF e 28 nomes comuns** entram de uma vez. Antes, eram 148 campos
+digitados um a um.
+
+---
+
+## Listas oficiais brasileiras embutidas
+
+**A de maior valor legal, e a única que não depende de rede.**
+
+`js/listas-oficiais.js` traz os **1.407 táxons** da Lista Nacional de Espécies
+da Fauna Ameaçadas de Extinção — Portal Brasileiro de Dados Abertos
+(`dados.gov.br`), Ministério do Meio Ambiente, licença **Creative Commons
+Atribuição**. O CSV de origem fica em `dados/fauna-ameacada-2021.csv` e a
+conversão é feita fora do navegador, por `gerar-listas.py`, porque o app é de
+zero dependências.
+
+As categorias vêm por extenso no CSV e viram sigla: `Criticamente em Perigo
+(CR)` → `CR`, `Em Perigo (EN)` → `EN`, `Vulnerável (VU)` → `VU`,
+`Regionalmente Extinta (RE)` → `RE`, `Extinta (EX)` → `EX`, `Extinta na
+Natureza (EW)` → `EW`. A marca `(PEX)` — provavelmente extinta — é preservada
+à parte. Os nomes são normalizados para **comparar** (minúsculas, sem acento,
+espaços colapsados) e a **grafia original é preservada** para exibir.
+
+`RE`, `EW` e `EX` entraram no domínio da coluna *Portaria MMA* e na lista de
+categorias que caracterizam ameaça. Uma espécie regionalmente extinta continua
+**na** lista, e sumia do laudo porque o campo não sabia representá-la.
+
+**O cruzamento roda sozinho**, sem clique e sem internet: é consulta a um
+arquivo que já está no app. Toda vez que a tela de Táxons desenha, todo táxon
+do catálogo é conferido.
+
+### O caso de regressão — confirmado
+
+No exemplo de avifauna, **`Amazona vinacea` é `VU` na lista oficial e o
+atributo `listaNacional` está vazio**. O resumo da planilha de origem declarava
+*"Ameaçada BR: 0"*. O correto é **1**.
+
+O app aponta isso em três lugares:
+
+- **Táxons**, com o número em terracota e a frase: *"O catálogo declara 0
+  espécies ameaçadas na Portaria do MMA, e a lista oficial aponta 1. Um laudo
+  que informa o número errado de espécies ameaçadas é passivo."*
+- **Resultados**, dentro de *Espécies de interesse*, com a mesma comparação e a
+  tabela de conferência.
+- **Laudo**, na seção *Conferência contra a Lista Nacional*, que sai mesmo
+  quando tudo confere — porque afirmar que conferiu é parte do que ele assina.
+
+**Total de divergências contra a lista oficial no exemplo: 2 táxons dos 60.**
+
+| Espécie | No catálogo | Na lista oficial | Situação |
+|---|---|---|---|
+| *Amazona vinacea* | (em branco) | `VU` (2021) | **falta preencher** — é o caso de regressão |
+| *Thamnophilus caerulescens* | (em branco) | `VU` (2021) | **só a subespécie consta** |
+
+O segundo é a diferença jurídica que o app **não** pode apagar: a lista traz
+`Thamnophilus caerulescens cearensis` e `T. c. pernambucensis`, duas
+subespécies do Nordeste — **não** a espécie. Preencher a espécie com a
+categoria da subespécie poria no laudo uma afirmação que a portaria não faz. O
+app mostra quais subespécies são, **não conta a espécie como ameaçada**, e
+deixa a decisão com quem assina.
+
+### As duas honestidades obrigatórias
+
+Aparecem na tela onde o dado aparece, e no laudo:
+
+1. **Este CSV é o documento de reavaliação de 2021, não o anexo literal da
+   Portaria MMA nº 148/2022**, que é o ato com força legal e substituiu a
+   444/2014. Serve como triagem; a conferência contra a portaria é obrigatória
+   antes de assinar.
+2. **Nenhuma lista estadual está embutida.** Não há fonte legível por máquina
+   da Deliberação Normativa COPAM 147/2010 (MG) nem das demais. A estrutura
+   está pronta (`LISTAS_OFICIAIS.ESTADUAIS`) e **vazia de propósito**: a coluna
+   *Lista estadual* continua manual. O app não inventa dado estadual.
+
+---
+
+## Dados secundários pela GBIF
+
+Na planilha, a aba `Outros` trazia **uma** referência bibliográfica digitada à
+mão, e a comparação primário × secundário era feita no olho. A tela
+**Secundários** troca isso pela lista inteira do que já foi publicado na
+região:
+
+```
+GET api.gbif.org/v1/occurrence/search
+    ?geoDistance={lat},{lon},{raio}km
+    &taxonKey={chave da classe}
+    &limit=0&facet=speciesKey&facetLimit=400&hasCoordinate=true
+```
+
+Cada `speciesKey` do facet é resolvido em `api.gbif.org/v1/species/{key}`, em
+lotes de 5 com pausa, e **guardado no `localStorage` com a data** — a segunda
+rodada é instantânea.
+
+A chave da classe é **descoberta na GBIF** a partir do grupo do projeto
+(`species/match?name=Aves&rank=CLASS`), nunca cravada no código. Herpetofauna é
+o caso que prova a regra: não é uma classe, são duas (Amphibia + Reptilia), e
+por isso o campo em `js/dados.js` é uma lista de nomes.
+
+### O que saiu para Mariana/MG — 20 km, Aves
+
+Rodado em 05/08/2026:
+
+| | |
+|---|---|
+| Ocorrências na área | **12.619** |
+| Espécies (facet `speciesKey`) | **383** |
+| Resolvidas em nome | **383** (nenhuma falhou) |
+| Riqueza do levantamento primário | 49 |
+
+O cruzamento nas três listas:
+
+| Lista | Quantas | Para que serve no laudo |
+|---|---|---|
+| **Exclusivas do primário** | **7** | é o valor do trabalho de campo |
+| **Em comum** | **42** | corrobora o levantamento |
+| **Esperadas para a região, não detectadas** | **341** | **é a que dá argumento** |
+
+Cobertura de 11 % do que a região tem; Jaccard 10,8 %. As esperadas saem
+**ordenadas por número de ocorrências na GBIF** — a ordem em que a ausência
+pesa mais. As dez primeiras: *Coereba flaveola* (211), *Chiroxiphia caudata*
+(181), *Pyriglena leucoptera* (157), *Tachyphonus coronatus* (146), *Elaenia
+flavogaster* (144), *Tangara cyanoventris* (143), *Synallaxis spixi* (140),
+*Myiozetetes similis* (138), *Aratinga leucophthalma* (137), *Coragyps atratus*
+(136).
+
+Ou o esforço foi insuficiente, ou essas espécies deixaram a área. **As duas
+conclusões são do laudo, e as duas precisam ser escritas por ele, não pelo
+app.**
+
+**O filtro exato e a data ficam gravados** e saem citados no laudo — sem isso o
+número não vale nada:
+
+> Fonte: GBIF · occurrence/search (geoDistance + facet speciesKey). Filtro:
+> geoDistance −20.3778, −43.4161, 20 km · classe Aves (taxonKey 212) ·
+> hasCoordinate=true · 12.619 ocorrências. Consultado em 05/08/2026 às 10:49.
+
+**Uma armadilha declarada na tela:** o cruzamento é **por nome**. Espécie que
+ainda está no catálogo com um sinônimo não casa com o nome aceito da GBIF e cai
+em "exclusivas do primário" parecendo achado — foi o que aconteceu com
+*Hydropsalis parvula* e *Pygochelidon cyanoleuca* nas 7 exclusivas do exemplo.
+O app avisa para rodar a Conferência taxonômica antes de levar a comparação
+para o laudo.
+
+---
+
+## Importar do eBird e do iNaturalist
+
+Os dois entram por **Projetos → Importar dados** e caem na **mesma tela de
+pré-visualização e mapeamento** que já existia: viram uma tabela Darwin Core e
+seguem o caminho conhecido. Criar um segundo caminho de importação seria criar
+um segundo lugar para dar errado — e a tela antiga já mostra o que vai entrar,
+já rejeita linha ruim com motivo, e já **reaproveita a espécie que existe no
+catálogo pelo nome normalizado, sem duplicar**.
+
+### iNaturalist — sem chave
+
+```
+GET api.inaturalist.org/v1/observations?user_login={login}&taxon_id=…&per_page=200
+```
+
+Traz espécie, data, hora, coordenada, local, quantidade e o link da
+observação. É o **caderno de campo de um usuário**, não uma varredura do banco.
+Pagina sozinho até 10 páginas (2.000 observações); acima disso avisa que veio
+truncado e manda exportar o CSV no site.
+
+Observação identificada **acima do nível de espécie** (gênero, família) é
+separada, contada e avisada — não entra na riqueza, porque inflaria o `S`.
+
+Usuário que não existe devolve `422`, e o app diz *"O iNaturalist não conhece o
+usuário X"* em vez de um erro de rede genérico.
+
+### eBird — precisa de chave, e ela é gratuita
+
+```
+GET api.ebird.org/v2/data/obs/geo/recent?lat=…&lng=…&dist=…&back=…
+Header: X-eBirdApiToken
+```
+
+A chave sai em minutos em `ebird.org/api/keygen`. Fica no **`localStorage`
+deste aparelho** — **nunca no código**, nunca no backup JSON exportado. Um
+campo nos parâmetros a guarda; deixá-lo vazio a apaga.
+
+**Sem chave, o app funciona igual** — só o eBird fica de fora, com o aviso
+dizendo onde consegui-la. Chave errada devolve `403`, e o app diz *"O eBird
+recusou a chave (403)"* em vez de repetir o código HTTP.
+
+Uma limitação declarada na própria tela: **a eBird não publica endpoint de
+"minhas observações"** — o que existe é por área, com teto de 50 km e 30 dias.
+Então o que entra é o que a comunidade registrou na região, e deve ser tratado
+como dado de apoio, não como caderno pessoal.
+
+---
+
+## O cache das consultas
+
+Tudo o que sai para a rede é guardado em `localStorage`, na chave
+`searaFauna.cache.v1`, **com a data da consulta**. Consulta repetida não sai de
+novo. Validades: 180 dias para taxonomia, 30 para ocorrências, 1 dia para
+observações. As gravações são agrupadas (383 espécies resolvidas em sequência
+não podem virar 383 serializações do cache inteiro), o cache é podado pelas
+entradas mais velhas acima de 4.000, e se o `localStorage` encher ele descarta
+metade e tenta de novo antes de desistir em silêncio.
+
+**Sem rede, resposta velha é melhor do que resposta nenhuma** — desde que a
+tela diga que é velha, e ela diz: toda resposta carrega `consultadoEm`, e é
+essa data que aparece na tela e no laudo.
+
+---
+
 ## Importação
 
-**Projetos → Importar dados** oferece três caminhos: o backup JSON do app, uma
-tabela CSV/TSV qualquer, e Darwin Core.
+**Projetos → Importar dados** oferece cinco caminhos: o backup JSON do app, uma
+tabela CSV/TSV qualquer, Darwin Core, o iNaturalist e o eBird.
 
 ### Tabela CSV / TSV — mapeamento na tela
 
@@ -454,16 +801,24 @@ JSON com um script equivalente. (Ainda não implementado — ver pendências.)
 
 ## Pendências jurídicas sinalizadas no app
 
-1. A planilha usa a **Portaria MMA 444/2014**, substituída pela **148/2022**.
-   Lista desatualizada em laudo oficial é passivo. **Confirmar com o João** qual
-   deve valer.
-2. **A API do IUCN proíbe uso comercial** — consultoria remunerada é uso
-   comercial, e a alternativa deles (IBAT) é paga. Por isso o app **não consulta
-   a IUCN**: a categoria é digitada pelo responsável técnico, como referência.
-   As listas com força legal no laudo brasileiro são a **Portaria do MMA** e a
-   **estadual**, atos normativos públicos.
+1. A lista embutida é a **reavaliação de 2021**, não o anexo literal da
+   **Portaria MMA nº 148/2022** — que é o ato com força legal e substituiu a
+   444/2014. O app cruza automaticamente e aponta divergência, mas declara a
+   limitação onde o dado aparece: **serve como triagem, não substitui a
+   conferência contra a portaria.**
+2. **Nenhuma lista estadual está embutida.** Não há fonte legível por máquina
+   da COPAM 147/2010 (MG) nem das demais. A coluna *Lista estadual* continua
+   manual, e o app **não inventa dado estadual**.
+3. **A API do IUCN proíbe uso comercial** — consultoria remunerada é uso
+   comercial, e a alternativa deles (IBAT) é paga. Por isso o app **não
+   consulta a IUCN**: a categoria chega pelo **iNaturalist**, que republica o
+   dado sob termo próprio, e sempre com a **autoridade declarada na tela**.
+   Quando a autoridade não é a IUCN, o app diz de quem é e **não** propõe
+   preencher a coluna IUCN. As listas com força legal no laudo brasileiro são a
+   **Portaria do MMA** e a **estadual**, atos normativos públicos.
 
-Os dois avisos aparecem na tela de Resultados, junto às espécies de interesse.
+Os três avisos aparecem na tela de Táxons (junto ao cruzamento), na de
+Resultados (junto às espécies de interesse) e no laudo.
 
 ---
 
@@ -498,7 +853,7 @@ Os dois avisos aparecem na tela de Resultados, junto às espécies de interesse.
 Rodado em `http://localhost:8081/` (a 8080 estava ocupada por outro app), com
 automação no Chrome.
 
-- Carrega sem nenhum erro no console; os 7 módulos sobem.
+- Carrega sem nenhum erro no console; os 11 módulos sobem.
 - **`testes.html`: 20 de 20 verificações conferem** contra a saída publicada do
   `vegan` (`specpool(dune, Management)` e `estimateR(BCI[1:5,])`), o exemplo de
   Heltshe & Forrester reimpresso em Krebs (Box 13.2) e o IC log-normal de Chao.
@@ -521,11 +876,49 @@ automação no Chrome.
   espécies que já existiam no catálogo **reaproveitadas em vez de duplicadas**.
 - Verificação GBIF em lote nas 60 espécies de avifauna: 49 conferem, 11
   divergentes. As 23 espécies de mastofauna: **23/23 exatas e aceitas**.
-- 390 px: sem rolagem lateral em nenhuma das 8 telas, nos dois exemplos; barra
+- 390 px: sem rolagem lateral em nenhuma das 9 telas, nos dois exemplos; barra
   de rodapé colada embaixo; os atalhos de espécie viram uma faixa que rola
   sozinha, sem levar a página junto.
 - Laudo impresso com o app em tema escuro: sai em fundo branco com texto
   escuro.
+
+### Terceira rodada — automação, medida contra as APIs de verdade
+
+Tudo abaixo foi rodado em `http://localhost:8081/` no Chrome, em 05/08/2026,
+contra as APIs públicas — não contra respostas simuladas.
+
+- **Autoecologia em lote nas 60 espécies de avifauna:** 69 s, 513 propostas
+  (122 em branco, 24 divergências, 28 de grafia, 4 de atenção, 366
+  confirmações). Nenhuma fonte falhou, nenhum táxon ficou sem resposta.
+  Aceitando em lote: 60 autorias, 60 chaves GBIF e 28 nomes comuns gravados,
+  cada um com fonte e data em `procedencia`.
+- **Lista Nacional:** 1.407 táxons carregados; `Amazona vinacea` → `VU` (2021)
+  com o campo em branco no catálogo — **o caso de regressão, confirmado**; e o
+  aviso *"o catálogo declara 0 e a lista oficial aponta 1"* em Táxons,
+  Resultados e no laudo. `Thamnophilus caerulescens` corretamente classificado
+  como "só a subespécie consta" e **fora** da contagem de ameaçadas.
+- **Dados secundários, Mariana/MG, 20 km, Aves:** 12.619 ocorrências, 383
+  espécies, 383 resolvidas em nome em 30 s (com o cache quente, instantâneo).
+  Cruzamento: 7 exclusivas do primário, 42 em comum, 341 esperadas não
+  detectadas.
+- **iNaturalist:** consulta real de observações → tabela Darwin Core → o
+  importador reconhece **as 12 colunas sozinho** e monta o plano. Importado
+  pela interface: **nenhum táxon duplicado** (60 → 61, uma espécie nova), e
+  `origemDados` gravado no projeto.
+- **Degradação de rede:** com `api.gbif.org`, `api.inaturalist.org` e
+  `api.ebird.org` bloqueados — a tela de Táxons desenha, o **cruzamento com a
+  lista oficial continua funcionando** (é offline), a autoecologia em lote para
+  no primeiro táxon em vez de insistir 60 vezes e diz qual fonte não respondeu,
+  a busca de secundários avisa *"Sem conexão com a GBIF. O resto do app
+  continua funcionando"*, e o laudo abre inteiro. **Zero erros de página.**
+- **eBird sem chave:** mensagem explicando onde conseguir a chave gratuita, sem
+  travar nada. **Com chave inválida:** *"O eBird recusou a chave (403)"*.
+  ⚠️ **Não foi testado com uma chave válida** — não há chave nesta máquina.
+- **390 px, com a 9ª aba:** a barra de navegação passou a duas fileiras de 5. O
+  rótulo "Secundários" e os botões de ação longos estavam estourando a largura
+  da tela; corrigido com `minmax(0, 1fr)` nas colunas de grid e `min-width: 0`
+  nos itens. Medido de novo: **`scrollWidth` = `clientWidth` = 390 nas 9
+  telas**, e 1280 no desktop.
 
 ## Velocidade de lançamento — medida, não achada
 
@@ -578,9 +971,26 @@ lista, e clicar no botão *Lançar* continua funcionando.
 
 ### O que ficou de fora
 
-- **A lista de dados secundários** é digitada à mão (Resultados → Dados
-  primários × secundários → Editar lista); não é lida da planilha, que também
-  não a traz.
+- **A lista estadual continua manual.** Não há fonte legível por máquina da
+  COPAM 147/2010 nem das demais estaduais. A estrutura para recebê-las está
+  pronta e vazia.
+- **O eBird não foi testado com chave válida** — não há chave nesta máquina. O
+  caminho sem chave e o caminho com chave errada foram, e os dois degradam com
+  aviso claro. O endpoint escolhido (`data/obs/geo/recent`) é o que existe: a
+  eBird não publica "minhas observações", e o teto de 50 km / 30 dias é da API.
+- **A categoria IUCN cobre pouco.** O iNaturalist só publica
+  `conservation_status` de quem não é "pouco preocupante" — no exemplo de
+  avifauna, 57 de 60 táxons voltaram sem categoria. O app declara isso na tela;
+  não há como distinguir "LC" de "não avaliada" por esta via.
+- **A lista bibliográfica nominal** continua digitada à mão (Secundários →
+  Lista bibliográfica digitada). A comparação com a GBIF não a substitui quando
+  há um levantamento publicado que valha citar nominalmente.
+- **A busca de secundários não sugere a coordenada do município.** Se nenhuma
+  unidade amostral tem coordenada, o ponto é digitado — o app prefere pedir a
+  chutar.
+- **O cruzamento de secundários é por nome literal.** Sinônimo não resolvido no
+  catálogo aparece como exclusivo do primário. Está avisado na tela, mas não há
+  resolução automática de sinonímia no cruzamento.
 - **Foto do registro** é um campo de texto, não upload — imagem em
   `localStorage` estouraria a cota rápido.
 - **A curva do coletor ainda usa bootstrap** para o intervalo. O Mao Tau tem

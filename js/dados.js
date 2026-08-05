@@ -190,14 +190,23 @@
     'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'];
 
   /* `classe` é só o padrão que o formulário de táxon sugere para o grupo —
-     nada no cálculo depende dela. */
+     nada no cálculo depende dela.
+
+     `classesGbif` são os NOMES das classes na espinha dorsal do GBIF, usados
+     para filtrar a busca de dados secundários. São nomes, não números: a
+     chave numérica (`taxonKey`) é perguntada à própria GBIF em
+     SECUNDARIOS.chavesDoGrupo(). Cravar 212 aqui seria apostar que a
+     taxonomia do GBIF nunca muda.
+
+     Herpetofauna é o caso que prova a regra: não é UMA classe, são duas —
+     Amphibia e Reptilia. Por isso o campo é lista. */
   var GRUPOS = [
-    { chave: 'aves', rotulo: 'Aves', classe: 'Aves' },
-    { chave: 'mastofauna', rotulo: 'Mastofauna', classe: 'Mammalia' },
-    { chave: 'herpetofauna', rotulo: 'Herpetofauna', classe: '' },
-    { chave: 'ictiofauna', rotulo: 'Ictiofauna', classe: 'Actinopterygii' },
-    { chave: 'entomofauna', rotulo: 'Entomofauna', classe: 'Insecta' },
-    { chave: 'outro', rotulo: 'Outro grupo', classe: '' }
+    { chave: 'aves', rotulo: 'Aves', classe: 'Aves', classesGbif: ['Aves'] },
+    { chave: 'mastofauna', rotulo: 'Mastofauna', classe: 'Mammalia', classesGbif: ['Mammalia'] },
+    { chave: 'herpetofauna', rotulo: 'Herpetofauna', classe: '', classesGbif: ['Amphibia', 'Reptilia'] },
+    { chave: 'ictiofauna', rotulo: 'Ictiofauna', classe: 'Actinopterygii', classesGbif: ['Actinopterygii'] },
+    { chave: 'entomofauna', rotulo: 'Entomofauna', classe: 'Insecta', classesGbif: ['Insecta'] },
+    { chave: 'outro', rotulo: 'Outro grupo', classe: '', classesGbif: [] }
   ];
 
   function grupo(chave) {
@@ -213,7 +222,8 @@
   var ATRIBUTOS = [
     {
       chave: 'iucn', rotulo: 'IUCN', grupo: 'todos', curto: 'IUCN',
-      ajuda: 'Categoria da Lista Vermelha da IUCN. Referência internacional, sem força legal no laudo brasileiro.',
+      ajuda: 'Categoria da Lista Vermelha da IUCN. Referência internacional, sem força legal no laudo brasileiro. ' +
+        'O app não consulta a API da IUCN (uso comercial proibido): a categoria chega pelo iNaturalist, que a republica.',
       opcoes: [
         { valor: '', rotulo: '—' },
         { valor: 'LC', rotulo: 'LC — Pouco preocupante' },
@@ -221,17 +231,27 @@
         { valor: 'VU', rotulo: 'VU — Vulnerável' },
         { valor: 'EN', rotulo: 'EN — Em perigo' },
         { valor: 'CR', rotulo: 'CR — Criticamente em perigo' },
+        { valor: 'EW', rotulo: 'EW — Extinta na natureza' },
+        { valor: 'EX', rotulo: 'EX — Extinta' },
         { valor: 'DD', rotulo: 'DD — Dados insuficientes' }
       ]
     },
     {
+      /* O domínio tem EW, RE e EX porque a Lista Nacional os usa: uma espécie
+         regionalmente extinta continua NA lista, e some do laudo se o campo
+         não souber representá-la. */
       chave: 'listaNacional', rotulo: 'Portaria MMA', grupo: 'todos', curto: 'MMA',
-      ajuda: 'Lista Nacional de Espécies Ameaçadas. A Portaria MMA 444/2014 foi substituída pela 148/2022 — confira a vigente.',
+      ajuda: 'Lista Nacional de Espécies Ameaçadas. O app cruza sozinho com a lista oficial embutida ' +
+        '(reavaliação de 2021, dados abertos do MMA) e aponta divergência — mas o ato com força legal ' +
+        'é a Portaria MMA 148/2022, que substituiu a 444/2014. Confira antes de assinar.',
       opcoes: [
         { valor: '', rotulo: '—' },
         { valor: 'VU', rotulo: 'VU — Vulnerável' },
         { valor: 'EN', rotulo: 'EN — Em perigo' },
-        { valor: 'CR', rotulo: 'CR — Criticamente em perigo' }
+        { valor: 'CR', rotulo: 'CR — Criticamente em perigo' },
+        { valor: 'RE', rotulo: 'RE — Regionalmente extinta' },
+        { valor: 'EW', rotulo: 'EW — Extinta na natureza' },
+        { valor: 'EX', rotulo: 'EX — Extinta' }
       ]
     },
     {
@@ -481,8 +501,10 @@
     return String(valor);
   }
 
-  /** Categorias que caracterizam ameaça em qualquer das três listas. */
-  var AMEACA = ['VU', 'EN', 'CR'];
+  /* Categorias que caracterizam ameaça em qualquer das três listas.
+     RE, EW e EX entram porque a Lista Nacional as usa e porque uma espécie
+     extinta na área é achado de laudo, não ausência de achado. */
+  var AMEACA = ['VU', 'EN', 'CR', 'RE', 'EW', 'EX'];
 
   /** A espécie está ameaçada segundo o valor informado nesta lista? */
   function ehAmeaca(valor) {
@@ -497,11 +519,16 @@
 
   /* Avisos jurídicos que o app precisa carregar para o laudo (§6 da spec). */
   var AVISOS_LEGAIS = [
-    'A Portaria MMA 444/2014 foi substituída pela Portaria MMA 148/2022. Confira se a lista ' +
-    'usada no laudo é a vigente — lista desatualizada em documento oficial é passivo.',
+    'A lista nacional embutida neste app é o documento de <strong>reavaliação de 2021</strong> ' +
+    '(dados abertos do MMA, licença Creative Commons Atribuição) — <strong>não</strong> é o anexo ' +
+    'literal da <strong>Portaria MMA nº 148/2022</strong>, que é o ato com força legal e substituiu ' +
+    'a 444/2014. Use o cruzamento como triagem e confira contra a portaria antes de assinar.',
+    'Nenhuma lista <strong>estadual</strong> está embutida: não há fonte legível por máquina da ' +
+    'Deliberação Normativa COPAM 147/2010 (MG) nem das demais. A coluna “Lista estadual” continua ' +
+    'sendo preenchida por você, à mão — o app não inventa dado estadual.',
     'A API da IUCN proíbe uso comercial (consultoria remunerada é uso comercial). As listas com ' +
     'força legal no laudo brasileiro são a Portaria do MMA e a estadual, atos normativos públicos. ' +
-    'A categoria IUCN entra aqui apenas como referência, digitada pelo responsável técnico.'
+    'A categoria IUCN entra como referência, pelo iNaturalist, sempre com a autoridade declarada.'
   ];
 
   global.DADOS = {

@@ -635,6 +635,18 @@ kbd {
 .div-texto { font-size: .85rem; color: var(--texto-2); line-height: 1.5; }
 .div-acoes { display: flex; gap: var(--e2); flex-wrap: wrap; margin-top: 2px; }
 
+/* ---------------------------------- revisão da autoecologia automática
+   A coluna de procedência traz fonte, data e a nota que explica a proposta.
+   Sem um teto de largura ela vira uma linha só, quilométrica, e empurra os
+   botões de aceitar/recusar para fora do alcance. Com teto, o texto quebra
+   e a linha cresce para baixo — que é onde há espaço. */
+.cel-fonte {
+  max-width: 38ch; white-space: normal; font-size: .8rem; line-height: 1.45;
+}
+td:has(> .cel-fonte), .tabela td .cel-fonte { vertical-align: top; }
+.cel-fonte-data { color: var(--texto-3); }
+.cel-fonte-nota { color: var(--texto-2); display: inline-block; margin-top: 2px; }
+
 .estado-gbif { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; font-weight: 650; }
 .estado-gbif::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--texto-3); }
 .estado-gbif.confere::before { background: var(--verde-600); }
@@ -684,6 +696,10 @@ kbd {
   border-radius: var(--r-lg); box-shadow: var(--sombra-1); padding: var(--e5);
 }
 .ajuda .cartao h2 { margin: 0 0 var(--e2); font-size: 1.18rem; letter-spacing: -.01em; }
+/* Subtítulo colado no parágrafo ou na lista anterior some como subtítulo —
+   vira só uma linha em negrito no meio do texto. */
+.ajuda .cartao h3 { margin-top: var(--e5); }
+.ajuda .cartao > h3:first-of-type, .ajuda .cartao h2 + h3 { margin-top: var(--e3); }
 .ajuda p { margin: 0 0 var(--e2); color: var(--texto-2); line-height: 1.65; max-width: 62ch; }
 .ajuda p:last-child { margin-bottom: 0; }
 .ajuda strong { color: var(--texto); font-weight: 650; }
@@ -736,7 +752,7 @@ kbd {
   .nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
     width: auto; max-width: none; margin: 0; order: 0; overflow: visible;
-    display: grid; grid-template-columns: repeat(8, 1fr); gap: 0;
+    display: grid; grid-template-columns: repeat(9, 1fr); gap: 0;
     background: var(--superficie); border: 0; border-top: 1px solid var(--borda);
     border-radius: 0;
     padding: 6px 2px calc(6px + env(safe-area-inset-bottom, 0px));
@@ -746,6 +762,9 @@ kbd {
     display: grid; place-items: center; padding: 7px 2px; min-height: 44px;
     border-radius: var(--r-sm); font-size: .68rem; line-height: 1.15; text-align: center;
     letter-spacing: -.01em;
+    /* sem isto a coluna do grid não encolhe abaixo do min-content e um rótulo
+       longo ("Secundários") empurra a barra inteira para fora da tela */
+    min-width: 0; overflow-wrap: anywhere;
   }
   .nav a[aria-current="page"] { background: var(--primaria); color: var(--texto-inv); font-weight: 700; }
   .btn-tema { margin-left: auto; }
@@ -772,9 +791,17 @@ kbd {
   .tela-cabec { flex-direction: column; align-items: stretch; gap: var(--e3); }
   .tela-cabec p { font-size: .9rem; }
 
-  /* ações viram botões largos, fáceis de acertar com o polegar */
-  .acoes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); width: 100%; }
-  .acoes .btn { width: 100%; justify-content: center; min-height: 46px; padding: 10px 12px; }
+  /* Ações viram botões largos, fáceis de acertar com o polegar.
+     `minmax(0, 1fr)` em vez de `1fr`: sem isso a coluna do grid não encolhe
+     abaixo do min-content do rótulo, e um botão de texto longo ("Adotar a
+     grafia das fontes") empurra a página inteira para fora da tela. O
+     `white-space: normal` é o par disso — o rótulo quebra em duas linhas
+     em vez de esticar a coluna. */
+  .acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e2); width: 100%; }
+  .acoes .btn {
+    width: 100%; justify-content: center; min-height: 46px; padding: 10px 12px;
+    min-width: 0; white-space: normal; text-align: center; line-height: 1.25;
+  }
   .acoes .btn:only-child, .acoes .btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
   .topo-int { padding: var(--e3); flex-wrap: nowrap; }
@@ -788,10 +815,10 @@ kbd {
   .marca-sub { font-size: .62rem; letter-spacing: .07em; }
   .marca svg { width: 30px; height: 30px; }
 
-  /* São 8 telas: em 8 colunas cada aba teria 45px e o rótulo não caberia.
-     Duas fileiras de 4 dão 44px de altura por alvo e o texto inteiro. */
-  .nav { grid-template-columns: repeat(4, 1fr); }
-  .nav a { font-size: .7rem; padding: 6px 2px; min-height: 40px; }
+  /* São 9 telas: em 9 colunas cada aba teria 42px e o rótulo não caberia.
+     Duas fileiras de 5 dão 44px de altura por alvo e o texto inteiro. */
+  .nav { grid-template-columns: repeat(5, 1fr); }
+  .nav a { font-size: .64rem; padding: 6px 1px; min-height: 40px; }
   main { padding: var(--e4) var(--e3) 140px; }
 
   .grade-2, .grade-3, .grade-4 { grid-template-columns: 1fr; }
