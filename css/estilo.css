@@ -274,6 +274,81 @@ main { max-width: 1240px; margin: 0 auto; padding: var(--e6) var(--e5) var(--e7)
 .card-titulo h2, .card-titulo h3 { margin: 0; }
 .card-nota { color: var(--texto-2); font-size: .87rem; }
 
+/* Card recolhível: o <summary> vira a linha clicável e o marcador nativo sai
+   de cena, para o bloco parecer um card e não um item de lista do navegador. */
+.recolhivel > summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; gap: var(--e2);
+  font-size: .89rem; color: var(--texto-2); font-weight: 600;
+}
+.recolhivel > summary::-webkit-details-marker { display: none; }
+.recolhivel > summary::before {
+  content: "›"; display: inline-block; font-size: 1.15rem; line-height: 1;
+  color: var(--texto-3); transition: transform var(--t); flex: none;
+}
+.recolhivel[open] > summary::before { transform: rotate(90deg); }
+.recolhivel > summary b { color: var(--texto); font-weight: 700; }
+
+/* ================================================================ achados
+   O painel de abertura da tela de Projetos. Duas cores, e elas separam
+   coisas diferentes: terracota é defeito que já está no dado e vai para o
+   laudo se ninguém mexer; verde é trabalho que ainda não foi feito. */
+.achados {
+  background: var(--superficie); border: 1px solid var(--borda);
+  border-radius: var(--r-lg); box-shadow: var(--sombra-1);
+  padding: var(--e5); margin-bottom: var(--e4);
+}
+.achados-topo {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--e3); flex-wrap: wrap; margin-bottom: var(--e4);
+}
+.achados-topo h2 { margin: 0; font-size: 1.14rem; }
+.achados-topo p { color: var(--texto-2); font-size: .86rem; margin-top: 3px; }
+.achados-titulo {
+  font-size: .77rem; font-weight: 700; color: var(--texto-2);
+  letter-spacing: .03em; text-transform: none;
+  margin: var(--e4) 0 var(--e2);
+}
+.achados-titulo-defeito { color: var(--terra-600); }
+.achados-lista { display: grid; gap: var(--e2); }
+
+.achado {
+  display: flex; align-items: flex-start; gap: var(--e3); width: 100%;
+  text-align: left; cursor: pointer;
+  padding: 11px var(--e4) 11px 12px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-left: 3px solid var(--verde-600);
+  border-radius: var(--r-md);
+  transition: border-color var(--t), background var(--t), box-shadow var(--t);
+}
+.achado:hover { background: var(--superficie); border-color: var(--verde-500); border-left-color: var(--verde-600); box-shadow: var(--sombra-1); }
+.achado:focus-visible { outline: none; box-shadow: var(--anel); }
+.achado-n {
+  font-size: 1.5rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.15;
+  color: var(--verde-800); font-variant-numeric: tabular-nums;
+  flex: none; min-width: 2.1ch; text-align: right;
+}
+.achado-corpo { flex: 1; min-width: 0; }
+/* `> b`, não `b`: o texto de apoio também usa <b> para grifar um número no
+   meio da frase, e um seletor solto o transformava em bloco — a frase
+   quebrava em três linhas no meio de "S = 49". */
+.achado-corpo > b { display: block; font-size: .92rem; font-weight: 650; color: var(--texto); line-height: 1.35; }
+.achado-corpo small { display: block; margin-top: 3px; font-size: .82rem; line-height: 1.5; color: var(--texto-2); }
+.achado-corpo small b { font-weight: 700; color: var(--texto); }
+.achado-seta { flex: none; color: var(--texto-3); font-size: 1.2rem; line-height: 1.2; }
+
+.achado-defeito { border-left-color: var(--terra); background: var(--terra-50); }
+.achado-defeito:hover { background: var(--terra-50); border-color: var(--terra-300); border-left-color: var(--terra); }
+.achado-defeito .achado-n { color: var(--terra); }
+
+/* O achado de maior consequência: mesma cor, mais peso. Não muda de cor
+   porque não é outra categoria — é a mesma, em destaque. */
+.achado-destaque { border-left-width: 5px; padding: var(--e4); }
+.achado-destaque .achado-n { font-size: 2.1rem; }
+.achado-destaque .achado-corpo b { font-size: 1rem; }
+
+.achados-oculto { margin-bottom: var(--e3); }
+
 .grade { display: grid; gap: var(--e4); }
 .grade-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .grade-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
@@ -806,6 +881,14 @@ td:has(> .cel-fonte), .tabela td .cel-fonte { vertical-align: top; }
 
   .topo-int { padding: var(--e3); flex-wrap: nowrap; }
   .card { padding: var(--e4); }
+
+  /* Painel de achados no celular: o número encolhe e a seta some — a linha
+     inteira já é o alvo de toque, e a seta roubava largura do texto. */
+  .achados { padding: var(--e4); }
+  .achado { padding: 10px 12px 10px 10px; gap: var(--e2); }
+  .achado-n { font-size: 1.3rem; }
+  .achado-destaque .achado-n { font-size: 1.7rem; }
+  .achado-seta { display: none; }
 
   /* "Levantamento de fauna" é longo: em linha ele empurra o botão de tema
      para uma segunda fileira e deixa o cabeçalho com um vão vazio. Empilhado

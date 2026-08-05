@@ -234,6 +234,14 @@ Achados reais do teste (usar como caso de regressão):
 O último **não é erro** — é divergência real entre autores sobre desmembrar
 Rhynchocyclidae de Tyrannidae. Mostrar as duas, deixar ele escolher.
 
+> **Caso de regressão acrescentado em 05/08/2026** (medido no exemplo de
+> mastofauna): a espinha dorsal da GBIF devolve **autoria truncada** em parte
+> dos mamíferos — `Procyon cancrivorus G` e `Mazama gouazoubira G.Fischer`,
+> sem ano e sem parêntese. Extrair isso fazia o app propor a troca de
+> `(G. Cuvier, 1798)`, que está certo, por `G`. `GBIF.autorDe()` passou a só
+> devolver autoria com **ano de quatro dígitos**; sem ano, não propõe nada.
+> Melhor faltar a sugestão do que estragar o que já estava certo.
+
 ---
 
 ## 5. Importação

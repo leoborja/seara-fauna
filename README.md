@@ -111,11 +111,32 @@ campanhas.
 > Os dados de campo do exemplo de mastofauna são fictícios e as categorias de
 > ameaça são ilustrativas. O aviso está dentro do próprio projeto.
 
+## O painel de achados
+
+A tela de Projetos abre com **o que o app já encontrou no projeto aberto** —
+uma linha por achado, com o número em destaque, e cada linha abre a tela onde o
+dado está. O painel afirma, a tela prova.
+
+**Nada ali é escrito no código.** Todo número sai do estado: com o dado dele
+carregado, o painel mostra o dado dele; achado que não existe não aparece; e
+projeto sem nenhum achado não mostra painel nenhum. Duas famílias, e a cor
+separa uma da outra:
+
+| Família | Cor | O que entra |
+|---|---|---|
+| **Defeito no dado** | terracota | espécie que a Lista Nacional aponta como ameaçada e o catálogo não declara (em destaque), categoria que não bate com a lista, nome que a GBIF trata como sinônimo ou erro de digitação |
+| **Falta preencher** | verde | espécies esperadas na região e não detectadas, espécie do catálogo sem registro em unidade amostral, unidade sem esforço, campo que as fontes sabem buscar, táxon não conferido |
+
+O catálogo é do app inteiro, mas o painel conta **só o grupo faunístico do
+projeto** — com os dois exemplos abertos, o de aves conta 60 táxons e o de
+mastofauna conta 23. O botão *Dispensar* é por projeto e persiste; o link que
+fica no lugar traz de volta.
+
 ## As 9 telas
 
 | Tela | O que faz |
 |---|---|
-| **Projetos** | Empreendimento: cliente, município/UF, órgão, processo, responsável técnico |
+| **Projetos** | **Painel de achados** do projeto aberto, e o empreendimento: cliente, município/UF, órgão, processo, responsável técnico |
 | **Campanhas** | N campanhas por projeto, com sazonalidade. Sem limite, sem duplicação |
 | **Unidades amostrais** | Método, código, geo, ambiente, condições e **esforço** |
 | **Registros** | Lançamento rápido: autocompletar de espécie, `Enter` salva e devolve o foco |
@@ -920,6 +941,56 @@ contra as APIs públicas — não contra respostas simuladas.
   nos itens. Medido de novo: **`scrollWidth` = `clientWidth` = 390 nas 9
   telas**, e 1280 no desktop.
 
+### Quarta rodada — o painel de achados e a mastofauna sob as APIs
+
+Rodado em `http://localhost:8081/` no Chrome, em 05/08/2026, contra as APIs
+públicas. A rodada anterior tinha exercitado a automação **só no exemplo de
+avifauna**; esta fechou essa lacuna.
+
+**O que o painel calculou, sem nenhum número escrito no código:**
+
+| Achado | Avifauna (Mariana/MG) | Mastofauna (PCH Ribeirão do Cedro) |
+|---|---|---|
+| Ameaçada que o catálogo não declara | **1** — *Amazona vinacea*, VU (2021), campo em branco | 0 |
+| Categoria que não bate com a lista | 0 | **1** — *Puma concolor*: catálogo VU, lista oficial **NT** |
+| Nome desatualizado ou grafado errado (GBIF) | **8** — 5 sinônimos + 3 com `Furariidae → Furnariidae` | **0** — 23/23 exatas e aceitas |
+| Esperadas na região e não detectadas | **341** (12.619 ocorrências, 383 espécies em 20 km) | **5** (só 7 ocorrências de Mammalia publicadas em 20 km) |
+| Espécies do catálogo sem registro em unidade | **11** — S = 49 contra 60 no catálogo | 0 — S = 23 contra 23 |
+| Unidades sem esforço | **10** | 0 |
+| Campos que as fontes sabem buscar | **119** — 60 autorias, 58 IUCN, 1 Portaria | 0 |
+
+O *Puma concolor* é achado do próprio app: a reavaliação de 2021 **rebaixou a
+espécie de VU para NT**, e a autoecologia do exemplo trazia VU.
+
+**O que quebrou no exemplo de mastofauna, e o conserto:**
+
+- **A GBIF devolve autoria truncada em parte dos mamíferos.** `species/match`
+  respondeu `scientificName: "Procyon cancrivorus G"` e
+  `"Mazama gouazoubira G.Fischer"` — sem ano, sem ponto, sem parêntese. O app
+  extraía isso e **propunha trocar** `(G. Cuvier, 1798)`, que estava certo, por
+  `G`; como divergência de campo preenchido, entrava no *Aceitar todos*.
+  Consertado em `js/gbif.js`: `autorDe()` só devolve autoria que traga o **ano
+  de quatro dígitos**. Sem ano, não propõe nada. Medido depois do conserto: 21
+  autorias confirmadas, **2 sem proposta** (as duas truncadas), e as
+  divergências do lote caíram de 10 para 8. No exemplo de avifauna nenhuma
+  autoria se perdeu — todas vêm com ano.
+- Fora isso, **nada quebrou**: 23/23 na GBIF com casamento exato e nome aceito;
+  a chave da classe `Mammalia` foi descoberta na própria GBIF (`taxonKey` 359),
+  não cravada; nome comum em português veio para 23/23; nenhuma fonte falhou;
+  zero erros de console. O laudo do projeto de mastofauna sai com as 13 seções,
+  incluindo *Conferência contra a Lista Nacional*, *Dados primários ×
+  secundários* e *Procedência dos dados*.
+- **`testes.html`: 20 de 20** continuam conferindo depois do conserto.
+- **390 px:** `scrollWidth` = `clientWidth` = 390 nas 9 telas, **nos dois
+  exemplos**. Laudo impresso com o app em tema escuro: fundo `#fff`, texto
+  `#111`.
+
+**O que mudou de tom na tela de Projetos:** os avisos da importação (quatro
+tarjas laranja sobre a planilha de origem) passaram a nascer **recolhidos**,
+atrás de uma linha `Observações da leitura do arquivo (4)`. Eles descrevem o
+arquivo, não o trabalho dele; abertos, o app se apresentava como uma lista de
+problemas. Quem fica aberto é o painel de achados.
+
 ## Velocidade de lançamento — medida, não achada
 
 O João passa o tempo dele na tela de Registros. Antes de mexer, foi cronometrado
@@ -980,8 +1051,21 @@ lista, e clicar no botão *Lançar* continua funcionando.
   eBird não publica "minhas observações", e o teto de 50 km / 30 dias é da API.
 - **A categoria IUCN cobre pouco.** O iNaturalist só publica
   `conservation_status` de quem não é "pouco preocupante" — no exemplo de
-  avifauna, 57 de 60 táxons voltaram sem categoria. O app declara isso na tela;
-  não há como distinguir "LC" de "não avaliada" por esta via.
+  avifauna, 57 de 60 táxons voltaram sem categoria; no de mastofauna, 18 de 23.
+  O app declara isso na tela; não há como distinguir "LC" de "não avaliada" por
+  esta via.
+- **O nome comum que a GBIF ranqueia em primeiro nem sempre é o melhor.** Nas
+  23 espécies de mamífero ela propôs *Guará* para `Chrysocyon brachyurus`,
+  *Leão-baio* para `Puma concolor` e *Guaxinim* para `Procyon cancrivorus` —
+  todos são nomes usados, nenhum é o mais corrente. São propostas do tipo
+  *diverge*, mostradas com o valor atual ao lado e com as outras formas na
+  nota; mas **entram no "Aceitar todos"**. Nome popular não tem forma correta
+  única, e o app não tem critério para escolher: quem escolhe é ele, um a um.
+- **O filtro de secundários é por CLASSE, não por porte.** No projeto de
+  mastofauna de médio e grande porte, o que a GBIF devolve para `Mammalia` na
+  área inclui morcegos (*Artibeus*, *Desmodus*, *Micronycteris*). A lista de
+  "esperadas e não detectadas" precisa ser lida com isso em mente — a GBIF não
+  tem um recorte de porte para filtrar.
 - **A lista bibliográfica nominal** continua digitada à mão (Secundários →
   Lista bibliográfica digitada). A comparação com a GBIF não a substitui quando
   há um levantamento publicado que valha citar nominalmente.

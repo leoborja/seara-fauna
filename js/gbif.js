@@ -78,12 +78,30 @@
     return out.join(' ');
   }
 
-  /** Autor: o que sobra do scientificName depois do nome canônico. */
+  /**
+   * Autor: o que sobra do scientificName depois do nome canônico.
+   *
+   * A ESPINHA DORSAL DA GBIF ÀS VEZES DEVOLVE A AUTORIA TRUNCADA. Medido em
+   * 05/08/2026 nas 23 espécies do exemplo de mastofauna:
+   *
+   *   Procyon cancrivorus  → scientificName "Procyon cancrivorus G"
+   *   Mazama gouazoubira   → scientificName "Mazama gouazoubira G.Fischer"
+   *
+   * O certo é "(G. Cuvier, 1798)" e "(G. Fischer, 1814)". Devolver "G" faria
+   * o app PROPOR a troca de uma autoria correta por um fragmento — e o
+   * "aceitar todos" gravaria isso sem ninguém ver.
+   *
+   * Por isso só volta autoria que parece completa: com o ANO de quatro
+   * dígitos, que a nomenclatura zoológica exige citar. Sem ano, devolve vazio
+   * e o campo simplesmente não é proposto. Melhor faltar a sugestão do que
+   * estragar o que já estava certo.
+   */
   function autorDe(scientificName, canonicalName) {
     var s = String(scientificName || '').trim();
     var c = String(canonicalName || '').trim();
-    if (c && s.indexOf(c) === 0) return s.slice(c.length).trim();
-    return '';
+    if (!c || s.indexOf(c) !== 0) return '';
+    var a = s.slice(c.length).trim();
+    return /\b\d{4}\b/.test(a) ? a : '';
   }
 
   /* ============================================================ consulta */

@@ -227,6 +227,8 @@
      TELA 1 — PROJETOS
      ==================================================================== */
   function renderProjetos() {
+    var pa = $('#painel-achados');
+    if (pa) pa.innerHTML = painelAchadosHtml();
     mostrarAvisosImport();
     var pi = $('#painel-import');
     if (pi) { pi.innerHTML = painelImportHtml(); ligarPainelImport(); }
@@ -294,14 +296,342 @@
       (s === 'chuva' ? 'chuva' : 'seca') + '</span>';
   }
 
+  /* Os avisos da importação nascem RECOLHIDOS. Eles descrevem o arquivo de
+     origem, não o trabalho dele, e abertos ocupavam a primeira tela inteira —
+     o app se apresentava como uma lista de problemas. O painel de achados
+     acima é que fica aberto; isto aqui é a nota de rodapé da importação. */
   function mostrarAvisosImport() {
     var alvo = $('#avisos-import');
     var imp = estado.importacao;
     if (!imp || !imp.avisos || !imp.avisos.length) { alvo.innerHTML = ''; return; }
-    alvo.innerHTML = '<div class="card"><div class="card-titulo">' +
-      '<h3>Inconsistências encontradas na importação</h3>' +
-      '<button class="btn btn-fantasma btn-pq" data-acao="limpar-avisos" type="button">Dispensar</button></div>' +
-      '<div class="avisos-pilha">' + imp.avisos.map(function (a) { return avisoHtml(esc(a)); }).join('') + '</div></div>';
+    alvo.innerHTML = '<details class="card recolhivel"><summary>' +
+      '<span>Observações da leitura do arquivo <b>(' + imp.avisos.length + ')</b>' +
+      (imp.origem ? ' — ' + esc(imp.origem) : '') + '</span></summary>' +
+      '<div class="avisos-pilha" style="margin-top:var(--e3)">' +
+      imp.avisos.map(function (a) { return avisoHtml(esc(a)); }).join('') + '</div>' +
+      '<div class="acoes" style="margin-top:var(--e3)">' +
+      '<button class="btn btn-fantasma btn-pq" data-acao="limpar-avisos" type="button">Dispensar</button>' +
+      '</div></details>';
+  }
+
+  /* =======================================================================
+     PAINEL DE ACHADOS — o que o app já encontrou no projeto aberto
+
+     NADA AQUI É ESCRITO À MÃO. Todo número sai do estado: com o dado do João
+     carregado, o painel mostra o dado do João; sem achado, ele não aparece.
+
+     Duas famílias, e a cor separa uma da outra:
+
+       · DEFEITO NO DADO — ameaçada que o catálogo não declara, nome que a
+         GBIF trata como desatualizado. É erro que já está lá e vai para o
+         laudo assinado se ninguém mexer. Terracota.
+       · FALTA PREENCHER — esforço em branco, autoecologia vazia, nome ainda
+         não conferido. Não é erro; é trabalho que ainda não foi feito.
+
+     Cada linha é um botão que abre a tela onde o dado está — o painel afirma,
+     a tela prova.
+     ==================================================================== */
+
+  /**
+   * Os campos que uma fonte externa sabe buscar. Fora daqui (sensibilidade de
+   * Stotz, dependência de mata, endemismo, hábito, porte) não há fonte
+   * consultável: continua sendo conhecimento do biólogo. Contar esses campos
+   * como "a automação preenche" seria prometer o que o app não faz.
+   */
+  var CAMPOS_DE_FONTE = [
+    { chave: 'autor', alvo: 'taxon', rotulo: 'autoria', fonte: 'GBIF' },
+    { chave: 'nomeComum', alvo: 'taxon', rotulo: 'nome comum', fonte: 'GBIF / iNaturalist' },
+    { chave: 'classe', alvo: 'taxon', rotulo: 'classe', fonte: 'GBIF' },
+    { chave: 'ordem', alvo: 'taxon', rotulo: 'ordem', fonte: 'GBIF' },
+    { chave: 'familia', alvo: 'taxon', rotulo: 'família', fonte: 'GBIF' },
+    { chave: 'iucn', alvo: 'atributo', rotulo: 'categoria IUCN', fonte: 'iNaturalist' },
+    { chave: 'listaNacional', alvo: 'atributo', rotulo: 'categoria da Portaria', fonte: 'Lista Nacional' }
+  ];
+
+  /**
+   * O catálogo que serve a um projeto: o que foi registrado nele, mais o que
+   * está no catálogo do app com o mesmo grupo faunístico. O catálogo é do app
+   * inteiro — sem este recorte, abrir os dois exemplos faria o painel do
+   * projeto de aves contar as 23 espécies de mamífero.
+   */
+  function catalogoDoProjeto(p, idsRegistrados) {
+    var mapa = A.taxonsPorId();
+    var grupo = p.grupo || 'aves';
+    var vistos = {}, cat = [];
+    (idsRegistrados || []).forEach(function (id) {
+      var t = mapa[id];
+      if (t && !vistos[t.id]) { vistos[t.id] = 1; cat.push(t); }
+    });
+    estado.taxons.forEach(function (t) {
+      if ((t.grupo || 'aves') === grupo && !vistos[t.id]) { vistos[t.id] = 1; cat.push(t); }
+    });
+    return cat;
+  }
+
+  function plural(n, um, muitos) { return n === 1 ? um : muitos; }
+
+  function achadosDoProjeto(p) {
+    if (!p) return null;
+    var grupo = p.grupo || 'aves';
+    var mapaTx = A.taxonsPorId();
+    /* a mesma coleta da tela de Resultados: o S do painel é o S de lá */
+    var dados = coletar(p, 'projeto');
+    var idsReg = Object.keys(dados.total);
+    var S = idsReg.length;
+    var cat = catalogoDoProjeto(p, idsReg);
+
+    var destaque = null, defeitos = [], lacunas = [];
+
+    /* ---------------- 1. ameaçadas que o catálogo não declara --------------
+       O achado de maior consequência: a Lista Nacional aponta a espécie como
+       ameaçada e a coluna Portaria do MMA do catálogo não diz isso. Foi
+       exatamente o que aconteceu na planilha de origem. */
+    if (AE && LO) {
+      var cr = AE.cruzarListaOficial(cat);
+      var naoDeclara = cr.naLista.filter(function (x) {
+        return x.casamento !== 'subespecie' && x.oficial &&
+          D.ehAmeaca(x.oficial.categoria) && !D.ehAmeaca(x.atual);
+      });
+      if (naoDeclara.length) {
+        destaque = {
+          n: naoDeclara.length,
+          titulo: plural(naoDeclara.length,
+            'espécie ameaçada que o catálogo não declara',
+            'espécies ameaçadas que o catálogo não declara'),
+          texto: naoDeclara.slice(0, 4).map(function (x) {
+            return '<i class="cientifico">' + esc(M.nomeCientifico(x.taxon)) + '</i> consta como ' +
+              esc(x.oficial.categoria) + ' na Lista Nacional (' + esc(x.oficial.ano) + ')' +
+              (x.atual ? ', e o catálogo traz ' + esc(x.atual) : ', e o campo está em branco');
+          }).join('; ') +
+          (naoDeclara.length > 4 ? '; e mais ' + (naoDeclara.length - 4) : '') +
+          '. Um laudo que informa o número errado de espécies ameaçadas é passivo.',
+          destino: 'taxons', filtro: ''
+        };
+      }
+      var outras = cr.divergencias.filter(function (x) { return naoDeclara.indexOf(x) < 0; });
+      if (outras.length) {
+        defeitos.push({
+          n: outras.length,
+          titulo: plural(outras.length,
+            'categoria que não bate com a Lista Nacional',
+            'categorias que não batem com a Lista Nacional'),
+          texto: outras.slice(0, 3).map(function (x) {
+            return '<i class="cientifico">' + esc(M.nomeCientifico(x.taxon)) + '</i> — catálogo ' +
+              esc(x.atual || 'em branco') + ', lista oficial ' +
+              esc(x.sugerido || 'não consta como espécie');
+          }).join('; ') +
+          (outras.length > 3 ? '; e mais ' + (outras.length - 3) : '') + '.',
+          destino: 'taxons', filtro: ''
+        });
+      }
+    }
+
+    /* ------------- 2. nomes que a GBIF aponta como errados ----------------
+       Só o que já foi conferido: sem a Conferência taxonômica rodada, este
+       achado simplesmente não existe — e a lacuna correspondente aparece
+       mais abaixo. */
+    /* Conta TÁXONS, não propostas: `Hydropsalis parvula` volta com dois nomes
+       aceitos candidatos, e dizer "2 sinônimos" para uma espécie inflaria o
+       número. O que ele decide é a espécie, uma vez. */
+    var TIPOS_NOME = { sinonimo: 1, grafia: 1, digitacao: 1 };
+    var nSinonimo = 0, nGrafia = 0, nNome = 0, exGrafia = '';
+    cat.forEach(function (t) {
+      var temSin = false, temGrafia = false;
+      ((t.gbif && t.gbif.divergencias) || []).forEach(function (d) {
+        if (d.decidido || !TIPOS_NOME[d.tipo]) return;
+        if (d.tipo === 'sinonimo') temSin = true;
+        else {
+          temGrafia = true;
+          if (!exGrafia && d.atual && d.sugerido) exGrafia = d.atual + ' → ' + d.sugerido;
+        }
+      });
+      if (temSin) nSinonimo++;
+      if (temGrafia) nGrafia++;
+      if (temSin || temGrafia) nNome++;
+    });
+    if (nNome) {
+      var pedacos = [];
+      if (nSinonimo) {
+        pedacos.push(nSinonimo + ' ' + plural(nSinonimo,
+          'que a GBIF trata como sinônimo de um nome aceito',
+          'que a GBIF trata como sinônimos de nomes aceitos'));
+      }
+      if (nGrafia) {
+        pedacos.push(nGrafia + ' com provável erro de digitação' +
+          (exGrafia ? ' (' + esc(exGrafia) + ')' : ''));
+      }
+      defeitos.push({
+        n: nNome,
+        titulo: plural(nNome,
+          'táxon com nome desatualizado ou grafado errado, segundo a GBIF',
+          'táxons com nome desatualizado ou grafado errado, segundo a GBIF'),
+        texto: pedacos.join(' e ') + '. Cada um é aceito ou recusado por você, um a um — ' +
+          'divergência real entre autores não entra nesta conta.',
+        destino: 'taxons', filtro: 'divergentes'
+      });
+    }
+
+    /* ------------- 3. esperadas para a região e não detectadas ------------- */
+    var sg = p.secundariosGbif;
+    if (SEC && sg && sg.especies && sg.especies.length) {
+      var prim = idsReg.map(function (id) {
+        return mapaTx[id] ? M.nomeCientifico(mapaTx[id]) : '';
+      }).filter(Boolean);
+      var cz = SEC.cruzar(prim, sg.especies);
+      if (cz.esperadas.length) {
+        var f = sg.filtro || {};
+        lacunas.push({
+          n: cz.esperadas.length,
+          titulo: plural(cz.esperadas.length,
+            'espécie já registrada nesta região que o levantamento não detectou',
+            'espécies já registradas nesta região que o levantamento não detectou'),
+          texto: 'Ocorrências publicadas na GBIF num raio de ' + esc(fmt(f.raioKm, 0)) +
+            ' km em volta da área' +
+            ((f.classes || []).length ? ', classe ' + esc(f.classes.join(' + ')) : '') +
+            '. Ou o esforço foi curto, ou a espécie deixou a área — a conclusão é sua, o número e a fonte são do app.',
+          destino: 'secundarios', filtro: ''
+        });
+      }
+    }
+
+    /* ------------- 4. riqueza observada × tamanho do catálogo -------------- */
+    var semRegistro = cat.length - S;
+    if (S && semRegistro > 0) {
+      lacunas.push({
+        n: semRegistro,
+        titulo: plural(semRegistro,
+          'espécie do catálogo sem registro em nenhuma unidade amostral',
+          'espécies do catálogo sem registro em nenhuma unidade amostral'),
+        texto: 'A riqueza observada é <b>S = ' + esc(fmt(S, 0)) + '</b>, contada só sobre o que tem ' +
+          'registro em unidade amostral, e o catálogo deste grupo tem ' + esc(fmt(cat.length, 0)) +
+          ' táxons. A diferença costuma ser observação ocasional, fora das unidades: enquanto não ' +
+          'tiver uma unidade amostral própria, ela não entra na riqueza nem na curva do coletor. ' +
+          'É distinção que muda o laudo.',
+        destino: 'taxons', filtro: 'semRegistro'
+      });
+    }
+
+    /* ------------- 5. unidades sem esforço registrado ---------------------- */
+    var semEsf = [], campSemEsf = null;
+    (p.campanhas || []).forEach(function (c) {
+      (c.unidades || []).forEach(function (u) {
+        if (esforcoDe(u) !== null) return;
+        semEsf.push(u.codigo);
+        /* a tela de Unidades é por campanha: guardar QUAL abrir é o que faz
+           a linha provar o que afirma em vez de cair num estado vazio */
+        if (!campSemEsf) campSemEsf = { campanha: c.id, unidade: u.id };
+      });
+    });
+    if (semEsf.length) {
+      lacunas.push({
+        n: semEsf.length,
+        titulo: plural(semEsf.length,
+          'unidade amostral sem esforço preenchido',
+          'unidades amostrais sem esforço preenchido'),
+        texto: 'Sem esforço não há densidade nem comparação entre métodos, e elas ficam de fora ' +
+          'desses cálculos: ' + esc(semEsf.slice(0, 8).join(', ')) +
+          (semEsf.length > 8 ? ' e mais ' + (semEsf.length - 8) : '') + '.',
+        destino: 'unidades', filtro: '',
+        campanha: campSemEsf ? campSemEsf.campanha : '',
+        unidade: campSemEsf ? campSemEsf.unidade : ''
+      });
+    }
+
+    /* ------------- 6. campos que as fontes sabem buscar -------------------- */
+    var attrsGrupo = {};
+    D.atributosDoGrupo(grupo).forEach(function (a) { attrsGrupo[a.chave] = 1; });
+    var vazios = 0, porCampo = [];
+    CAMPOS_DE_FONTE.forEach(function (c) {
+      if (c.alvo === 'atributo' && !attrsGrupo[c.chave]) return;
+      var n = 0;
+      cat.forEach(function (t) {
+        /* a Lista Nacional só preenche quem está NELA — contar as outras
+           seria prometer um dado que a fonte não tem */
+        if (c.chave === 'listaNacional') {
+          var achadoLO = LO ? LO.buscar(M.nomeCientifico(t)) : null;
+          if (!achadoLO || achadoLO.tipo === 'subespecie') return;
+        }
+        var v = c.alvo === 'atributo' ? (t.atributos || {})[c.chave] : t[c.chave];
+        if (!String(v === undefined || v === null ? '' : v).trim()) n++;
+      });
+      if (n) { vazios += n; porCampo.push(n + ' de ' + c.rotulo); }
+    });
+    if (vazios) {
+      lacunas.push({
+        n: vazios,
+        titulo: plural(vazios,
+          'campo em branco que as fontes sabem buscar',
+          'campos em branco que as fontes sabem buscar'),
+        texto: porCampo.join(', ') + '. O botão <b>Preencher autoecologia</b> consulta GBIF, ' +
+          'iNaturalist e a Lista Nacional e propõe campo a campo — o que a fonte não tiver ' +
+          'continua em branco, e nada é gravado sem você aceitar.',
+        destino: 'taxons', filtro: ''
+      });
+    }
+
+    /* ------------- 7. ainda não conferidos na GBIF ------------------------- */
+    var naoVerif = cat.filter(function (t) { return !t.gbif; }).length;
+    if (naoVerif) {
+      lacunas.push({
+        n: naoVerif,
+        titulo: plural(naoVerif,
+          'táxon ainda não conferido na GBIF',
+          'táxons ainda não conferidos na GBIF'),
+        texto: 'A conferência taxonômica compara cada nome com a base internacional e separa ' +
+          'sinônimo, erro de digitação e divergência real entre autores.',
+        destino: 'taxons', filtro: 'naoVerificados'
+      });
+    }
+
+    return {
+      destaque: destaque, defeitos: defeitos, lacunas: lacunas,
+      total: (destaque ? 1 : 0) + defeitos.length + lacunas.length
+    };
+  }
+
+  function linhaAchado(a, classe) {
+    return '<button class="achado' + (classe ? ' ' + classe : '') + '" type="button" ' +
+      'data-acao="achado-ir" data-destino="' + esc(a.destino) + '" data-filtro="' + esc(a.filtro || '') + '"' +
+      (a.campanha ? ' data-campanha="' + esc(a.campanha) + '"' : '') +
+      (a.unidade ? ' data-unidade="' + esc(a.unidade) + '"' : '') + '>' +
+      '<span class="achado-n">' + fmt(a.n, 0) + '</span>' +
+      '<span class="achado-corpo"><b>' + a.titulo + '</b><small>' + a.texto + '</small></span>' +
+      '<span class="achado-seta" aria-hidden="true">›</span></button>';
+  }
+
+  function painelAchadosHtml() {
+    var p = A.ativos().projeto;
+    if (!p) return '';
+    var r = achadosDoProjeto(p);
+    if (!r || !r.total) return '';
+
+    if ((estado.achadosDispensados || {})[p.id]) {
+      return '<div class="achados-oculto">' +
+        '<button class="btn btn-fantasma btn-pq" data-acao="achados-mostrar" type="button">' +
+        icone('ico-lupa') + plural(r.total, ' Mostrar o achado de ', ' Mostrar os ' + r.total + ' achados de ') +
+        esc(p.nome) + '</button></div>';
+    }
+
+    var h = '<section class="achados" aria-labelledby="t-achados">' +
+      '<div class="achados-topo">' +
+      '<div><h2 id="t-achados">O que já foi encontrado neste projeto</h2>' +
+      '<p>' + esc(p.nome) + ' · ' + r.total + ' ' + plural(r.total, 'achado', 'achados') +
+      '. Cada linha abre a tela onde o dado está.</p></div>' +
+      '<button class="btn btn-fantasma btn-pq" data-acao="achados-dispensar" type="button">' +
+      icone('ico-x') + ' Dispensar</button></div>';
+
+    if (r.destaque || r.defeitos.length) {
+      h += '<h3 class="achados-titulo achados-titulo-defeito">Defeito no dado — já está no catálogo</h3>' +
+        '<div class="achados-lista">' +
+        (r.destaque ? linhaAchado(r.destaque, 'achado-defeito achado-destaque') : '') +
+        r.defeitos.map(function (a) { return linhaAchado(a, 'achado-defeito'); }).join('') + '</div>';
+    }
+    if (r.lacunas.length) {
+      h += '<h3 class="achados-titulo">Falta preencher — ainda não foi feito</h3>' +
+        '<div class="achados-lista">' +
+        r.lacunas.map(function (a) { return linhaAchado(a, ''); }).join('') + '</div>';
+    }
+    return h + '</section>';
   }
 
   /* =======================================================================
@@ -1712,18 +2042,36 @@
           icone('ico-check') + ' Aceitar os ' + c.preenche + ' campos em branco</button>' : '') +
         (c.grafia ? '<button class="btn btn-sec btn-pq" data-acao="auto-aceitar-grafia" type="button">' +
           icone('ico-check') + ' Adotar a grafia das fontes (' + c.grafia + ')</button>' : '') +
-        (c.preenche + c.diverge + c.grafia ? '<button class="btn btn-sec btn-pq" data-acao="auto-aceitar-todos" type="button">' +
-          icone('ico-check') + ' Aceitar todos (' + (c.preenche + c.diverge + c.grafia) + ')</button>' : '') +
+        /* "Aceitar todos" cobre campo em branco e grafia — nunca divergência.
+           Divergir significa que já existe valor escrito pelo responsável
+           técnico, e sobrescrever isso em lote troca "Papagaio de peito roxo"
+           por "Leão-baio" sem ele ver. As divergências têm ação própria,
+           porque entre elas está o achado que mais importa
+           (Furariidae → Furnariidae). */
+        (c.preenche + c.grafia ? '<button class="btn btn-sec btn-pq" data-acao="auto-aceitar-seguros" type="button">' +
+          icone('ico-check') + ' Aceitar em branco e grafia (' + (c.preenche + c.grafia) + ')</button>' : '') +
+        (c.diverge ? '<button class="btn btn-sec btn-pq" data-acao="auto-ir-divergencias" type="button">' +
+          icone('ico-alerta') + ' Revisar ' + c.diverge + ' divergência' + (c.diverge === 1 ? '' : 's') +
+          ' uma a uma</button>' : '') +
         '<button class="btn btn-fantasma btn-pq" data-acao="auto-recusar-todos" type="button">' +
         icone('ico-x') + ' Recusar tudo</button>' +
         '</div>' +
         (c.atencao ? '<div style="margin-top:var(--e3)">' + avisoHtml(
           '<strong>' + c.atencao + (c.atencao === 1 ? ' sugestão marcada' : ' sugestões marcadas') +
           ' como “atenção”</strong> fica' + (c.atencao === 1 ? '' : 'm') +
-          ' de fora do “aceitar todos”: é categoria de autoridade que não é a IUCN, espécie que a ' +
+          ' de fora de qualquer decisão em lote: é categoria de autoridade que não é a IUCN, espécie que a ' +
           'lista oficial só traz como subespécie, ou troca de gênero — que mudaria o nome científico. ' +
           'Cada uma pede decisão individual.') + '</div>' : '') +
-        tabelaSugestoes(pend);
+        (filtroSugestao
+          ? '<div class="acoes" style="margin-top:var(--e4)"><span class="tag tag-terra">Mostrando só as ' +
+            (pend.filter(function (x) { return x.p.tipo === filtroSugestao; }).length) +
+            ' divergências</span>' +
+            '<button class="btn btn-fantasma btn-pq" data-acao="auto-limpar-filtro" type="button">' +
+            'Ver todas as sugestões</button></div>'
+          : '') +
+        tabelaSugestoes(filtroSugestao
+          ? pend.filter(function (x) { return x.p.tipo === filtroSugestao; })
+          : pend);
     } else if (comSug) {
       h += '<div style="margin-top:var(--e4)">' + avisoHtml(
         'Nenhuma sugestão pendente. Tudo o que as fontes propuseram já foi decidido por você.', 'info') + '</div>';
@@ -1839,6 +2187,23 @@
     toast(aceitar
       ? p.rotulo + ' de ' + M.nomeCientifico(t) + ': preenchido com “' + p.sugerido + '”.'
       : 'Sugestão recusada — o dado continua como estava.');
+  }
+
+  /* Filtro da tabela de sugestões. Fica fora do estado salvo de propósito:
+     é escolha de visualização do momento, não dado do projeto. */
+  var filtroSugestao = null;
+
+  function irParaDivergencias() {
+    filtroSugestao = 'diverge';
+    renderTaxons();
+    var t = document.querySelector('#tela-taxons .tabela-envolve');
+    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast('Divergência é onde já existe valor escrito por você — por isso vai uma a uma.');
+  }
+
+  function limparFiltroSugestao() {
+    filtroSugestao = null;
+    renderTaxons();
   }
 
   function decidirEmLote(tipos, aceitar) {
@@ -3436,6 +3801,36 @@
       case 'limpar-avisos':
         delete estado.importacao; A.salvar(); renderProjetos(); break;
 
+      /* painel de achados */
+      case 'achado-ir':
+        var flt = el.getAttribute('data-filtro') || '';
+        if (flt) {
+          /* o filtro só prova o achado se o recorte de grupo não escondê-lo */
+          filtroTaxon.so = flt;
+          filtroTaxon.texto = '';
+          filtroTaxon.grupo = null;
+        }
+        /* a tela de Unidades e a de Registros são por campanha: sem abrir a
+           campanha certa, a linha levaria a um "nenhuma campanha aberta" */
+        if (idC && at.projeto) A.definirAtivos(at.projeto.id, idC, idU || null);
+        location.hash = '#' + (el.getAttribute('data-destino') || 'projetos');
+        break;
+
+      case 'achados-dispensar':
+        if (at.projeto) {
+          if (!estado.achadosDispensados) estado.achadosDispensados = {};
+          estado.achadosDispensados[at.projeto.id] = 1;
+          A.salvar(); renderProjetos();
+        }
+        break;
+
+      case 'achados-mostrar':
+        if (at.projeto && estado.achadosDispensados) {
+          delete estado.achadosDispensados[at.projeto.id];
+          A.salvar(); renderProjetos();
+        }
+        break;
+
       case 'nova-campanha': novaCampanha(); break;
 
       case 'abrir-campanha':
@@ -3514,7 +3909,9 @@
       case 'sug-recusar': decidirSugestao(idT, Number(el.getAttribute('data-i')), false); break;
       case 'auto-aceitar-vazios': decidirEmLote(['preenche'], true); break;
       case 'auto-aceitar-grafia': decidirEmLote(['grafia'], true); break;
-      case 'auto-aceitar-todos': decidirEmLote(['preenche', 'diverge', 'grafia'], true); break;
+      case 'auto-aceitar-seguros': decidirEmLote(['preenche', 'grafia'], true); break;
+      case 'auto-ir-divergencias': irParaDivergencias(); break;
+      case 'auto-limpar-filtro': limparFiltroSugestao(); break;
       case 'auto-recusar-todos': decidirEmLote(['preenche', 'diverge', 'grafia', 'atencao'], false); break;
 
       /* lista oficial */

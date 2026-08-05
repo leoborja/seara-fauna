@@ -93,7 +93,11 @@
         <button class="btn" id="btn-novo-projeto" type="button"><svg><use href="#ico-mais"></use></svg> Novo projeto</button>
       </div>
     </div>
-    <div id="avisos-import" class="avisos-pilha" style="margin-bottom:var(--e4)"></div>
+    <!-- Painel de achados: o que o app já encontrou no projeto aberto.
+         Todo o conteúdo é calculado em app.js a partir do estado — sem
+         projeto aberto ou sem achado, este bloco fica vazio. -->
+    <div id="painel-achados"></div>
+    <div id="avisos-import" style="margin-bottom:var(--e4)"></div>
     <div id="painel-import"></div>
     <div id="lista-projetos"></div>
     <input type="file" id="arquivo-import" accept="application/json,.json" hidden>
@@ -300,6 +304,30 @@
       </section>
 
       <section class="cartao">
+        <h2>O painel de abertura</h2>
+        <p>Com um projeto aberto, a tela de <strong>Projetos</strong> mostra em cima o que o
+        app já encontrou nele. Cada linha traz um número e <strong>abre a tela onde aquele
+        dado está</strong> — o painel afirma, a tela prova.</p>
+        <p>São duas famílias de achado, e a cor separa uma da outra:</p>
+        <ul class="lista-aviso">
+          <li><strong>Defeito no dado</strong>, em terracota — espécie que a Lista Nacional
+          aponta como ameaçada e o catálogo não declara, categoria que não bate com a lista,
+          nome que a GBIF trata como sinônimo ou como erro de digitação. É erro que já está
+          no catálogo e vai para o laudo assinado se ninguém mexer.</li>
+          <li><strong>Falta preencher</strong> — unidade amostral sem esforço, espécie do
+          catálogo sem registro em unidade nenhuma, campo que as fontes sabem buscar e está
+          em branco, táxon ainda não conferido. Não é erro: é trabalho que ainda não foi
+          feito.</li>
+        </ul>
+        <p><strong>Todo número ali é calculado do seu dado, na hora.</strong> Achado que não
+        existe não aparece, e projeto sem nenhum achado não mostra painel nenhum. O botão
+        <em>Dispensar</em> some com ele naquele projeto e o link que fica no lugar traz de
+        volta.</p>
+        <p class="dica">A espécie ameaçada que o catálogo não declara vem em destaque de
+        propósito: é o único item da lista que, sozinho, torna o laudo indefensável.</p>
+      </section>
+
+      <section class="cartao">
         <h2>O que a ferramenta calcula</h2>
         <p>A planilha antiga <strong>não calculava nenhum destes números</strong> — as abas
         <em>Dives</em> e <em>Estimates</em> tinham literalmente escrito “colar aqui os valores”, e
@@ -473,6 +501,36 @@
       </section>
 
       <section class="cartao">
+        <h2>Os dados secundários da região</h2>
+        <p>Na planilha antiga, a aba <em>Outros</em> trazia <strong>uma</strong> referência
+        bibliográfica digitada à mão. A tela de <strong>Secundários</strong> pergunta um ponto,
+        um raio e o grupo do projeto e traz da GBIF <strong>tudo o que já foi publicado naquela
+        área</strong> — em Mariana/MG, num raio de 20 km, foram 12.619 ocorrências e 383 espécies
+        de aves. É número que ninguém digita à mão.</p>
+        <p>O ponto vem da <strong>média das coordenadas das suas unidades amostrais</strong>. Se
+        nenhuma tiver coordenada, o app pede que você digite: ele não chuta a coordenada do
+        município. A chave numérica da classe — Aves, Mammalia, Amphibia + Reptilia — é
+        <strong>perguntada à própria GBIF</strong>, não está cravada no código, e por isso o
+        mesmo caminho serve a qualquer grupo.</p>
+        <h3>As três listas</h3>
+        <ul class="lista-aviso">
+          <li><strong>Exclusivas do seu levantamento.</strong> O que só o campo achou. É o valor
+          do trabalho de campo, e costuma ser o que o órgão pergunta.</li>
+          <li><strong>Em comum.</strong> O que a literatura corrobora.</li>
+          <li><strong>Esperadas para a região e não detectadas.</strong> O que a área tem e o
+          levantamento não pegou, com as mais registradas em primeiro — que é a ordem em que a
+          ausência pesa mais.</li>
+        </ul>
+        <p><strong>É a terceira que vira argumento de laudo.</strong> Ou o esforço foi
+        insuficiente, ou a espécie deixou a área: as duas conclusões contam, e as duas são suas.
+        O app entrega o número, o <strong>filtro exato</strong> usado na consulta e a data — que
+        é o que permite citar a fonte. Sem isso o número não vale nada.</p>
+        <p class="dica">O cruzamento é <strong>por nome científico</strong>: sinônimo ainda não
+        resolvido no catálogo cai em “exclusivas do primário” parecendo achado. Rode a
+        <em>Conferência taxonômica</em> antes de levar esta comparação para o laudo.</p>
+      </section>
+
+      <section class="cartao">
         <h2>Trazendo o eBird e o iNaturalist</h2>
         <p>Os dois entram por <strong>Projetos → Importar dados</strong> e caem na mesma tela de
         pré-visualização das planilhas: você vê o que vai entrar antes de entrar, e
@@ -534,21 +592,46 @@
       </section>
 
       <section class="cartao">
-        <h2>Trazendo a planilha para cá</h2>
-        <p>Ler <code>.xlsx</code> dentro do navegador exigiria uma biblioteca externa, e este app é
-        de <strong>zero dependências</strong> por decisão de projeto. Então a conversão acontece uma
-        vez, fora do navegador, com o script <code>importar.py</code>:</p>
-        <div class="formulas">
-          <div><code>python3 importar.py "Mineração Planalto.xlsx" -o planalto.json</code></div>
+        <h2>Por onde os dados entram</h2>
+        <p>Tudo passa por <strong>Projetos → Importar dados</strong>, e tudo cai na
+        <strong>mesma tela de pré-visualização e mapeamento</strong>: você vê o que vai entrar
+        antes de entrar, linha ruim é rejeitada <em>com o motivo</em>, e espécie que já está no
+        catálogo é <strong>reaproveitada pelo nome, nunca duplicada</strong>.</p>
+        <div class="ajuda-grade">
+          <div>
+            <h3>Planilha <code>.xlsx</code></h3>
+            <p>Ler <code>.xlsx</code> dentro do navegador exigiria uma biblioteca externa, e este
+            app é de <strong>zero dependências</strong> por decisão de projeto. A conversão
+            acontece uma vez, fora do navegador:</p>
+            <div class="formulas">
+              <div><code>python3 importar.py "Mineração Planalto.xlsx" -o planalto.json</code></div>
+            </div>
+            <p style="margin-top:var(--e3)">Depois, <strong>Importar dados → Backup JSON</strong>.
+            O script diz quantas espécies, famílias, ordens e unidades entraram, mais o que achou
+            de estranho: espécie na ficha de campo e não na autoecologia, transecto sem
+            comprimento, campanha em branco.</p>
+            <p class="dica">Um detalhe que o script trata: na aba <em>Autoecologia</em>,
+            <strong>ordem e família só aparecem na primeira espécie de cada grupo</strong> e ficam
+            zeradas nas seguintes. É agrupamento visual do Excel — o script arrasta o último valor
+            válido para baixo.</p>
+          </div>
+          <div>
+            <h3>CSV e TSV</h3>
+            <p>Qualquer tabela. Você diz na tela <strong>qual coluna é o quê</strong>, e o
+            mapeamento fica guardado por cabeçalho: o próximo arquivo igual já entra mapeado.
+            Aceita <code>;</code> e <code>,</code> como separador, vírgula decimal e data em
+            <code>dd/mm/aaaa</code>.</p>
+            <h3 style="margin-top:var(--e3)">Darwin Core</h3>
+            <p>O padrão do GBIF — <code>scientificName</code>, <code>individualCount</code>,
+            <code>eventDate</code>, <code>decimalLatitude</code>… — é
+            <strong>reconhecido sozinho</strong>, sem mapeamento. É o formato que sai de GBIF,
+            SiBBr, eBird e iNaturalist.</p>
+            <h3 style="margin-top:var(--e3)">iNaturalist e eBird, direto da API</h3>
+            <p>Sem exportar arquivo nenhum: o app consulta e monta a tabela Darwin Core sozinho. O
+            iNaturalist <strong>não pede chave</strong>; o eBird pede uma
+            <strong>chave gratuita</strong> — veja o quadro acima.</p>
+          </div>
         </div>
-        <p style="margin-top:var(--e3)">Depois é só <strong>Projetos → Importar JSON</strong>. O
-        script devolve na tela quantas espécies, famílias, ordens e unidades entraram, mais os avisos
-        do que ele encontrou de estranho — espécie que aparece na ficha de campo mas não na
-        autoecologia, transecto sem comprimento, campanha em branco.</p>
-        <p class="dica">Um detalhe da planilha que o script trata: na aba
-        <em>Autoecologia</em>, <strong>ordem e família só aparecem na primeira espécie de cada
-        grupo</strong> e ficam zeradas nas seguintes. É agrupamento visual do Excel — o script
-        arrasta o último valor válido para baixo.</p>
       </section>
 
       <section class="cartao">

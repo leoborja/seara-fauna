@@ -33,6 +33,9 @@
       campanhaAtiva: null,
       unidadeAtiva: null,
       exemploSemeado: false,
+      /* projetos cujo painel de achados ele mandou sumir — por projeto,
+         porque dispensar o de um empreendimento não diz nada sobre o outro */
+      achadosDispensados: {},
       /* de-para de colunas guardado por cabeçalho de arquivo importado */
       mapeamentos: {}
     };
