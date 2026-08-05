@@ -164,6 +164,26 @@ a { color: var(--verde-700); }
 
 .num, td.num, th.num, .tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 
+/* ----------------------------------------------------------------- ícones --
+   Rede de segurança para TODO ícone gerado por icone(), que emite
+   <svg><use href="#..."></svg> sem classe. Sem esta regra, um ícone posto numa
+   área sem estilo próprio de svg renderiza no tamanho padrão do elemento
+   substituído (300×150) e com preenchimento preto.
+
+   Foi exatamente isso que estourou o card de projeto: o pino virou um borrão
+   preto de 150 px de altura e, como .item-meta é flex com align-items padrão
+   (stretch), as tags ao lado esticaram junto e viraram elipses gigantes.
+
+   Especificidade (0,0,2) — igual à de `.btn svg` — e declarada ANTES dela de
+   propósito, para que qualquer regra específica escrita depois continue
+   vencendo. */
+svg:has(> use) {
+  width: 1em; height: 1em; flex: none;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  vertical-align: -0.125em;
+}
+
 /* ============================================================================
    NOME CIENTÍFICO — itálico, como manda a nomenclatura binomial.
    `text-transform: none` é declarado de propósito e não deve sair daqui:
@@ -362,7 +382,9 @@ table.tabela .quebra { white-space: normal; min-width: 12rem; }
 .item.ativo { border-color: var(--verde-600); box-shadow: var(--anel); }
 .item-corpo { flex: 1; min-width: 0; }
 .item-corpo h3 { font-size: 1rem; margin-bottom: 2px; }
-.item-meta { font-size: .84rem; color: var(--texto-2); display: flex; gap: var(--e3); flex-wrap: wrap; }
+/* align-items: center — sem isto os filhos esticam na altura da linha (stretch
+   é o padrão do flex) e qualquer item alto deforma as tags vizinhas. */
+.item-meta { font-size: .84rem; color: var(--texto-2); display: flex; align-items: center; gap: var(--e3); flex-wrap: wrap; }
 .item-meta span { display: inline-flex; align-items: center; gap: 5px; }
 .item-acoes { display: flex; gap: 4px; flex: none; }
 
@@ -534,8 +556,7 @@ table.tabela .quebra { white-space: normal; min-width: 12rem; }
 .atalho .cientifico { font-style: italic; text-transform: none !important; }
 .atalho-comum { font-size: .74rem; color: var(--texto-3); }
 
-/* No celular os atalhos viram uma faixa que rola sozinha. Empilhados, oito
-   deles empurravam o teclado e a tabela para fora da tela — e quem rola é a
+/* No celular os atalhos viram uma faixa que rola sozinha — quem rola é a
    faixa, nunca a página. */
 @media (max-width: 640px) {
   .atalhos { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
@@ -549,11 +570,25 @@ table.tabela .quebra { white-space: normal; min-width: 12rem; }
   text-transform: none;
 }
 
+/* Dica de teclado recolhida: uma linha discreta, o resto atrás do <details>.
+   Aberta, ela competia com o campo de digitação e virava parede de texto. */
 .dica-teclado {
+  margin-top: var(--e3);
+  font-size: .78rem; color: var(--texto-3);
+}
+.dica-teclado > summary {
+  cursor: pointer; list-style: none; padding: 2px 0;
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+}
+.dica-teclado > summary::-webkit-details-marker { display: none; }
+.dica-teclado > summary::after {
+  content: 'mais'; margin-left: 4px; color: var(--verde-700);
+  border-bottom: 1px dotted currentColor;
+}
+.dica-teclado[open] > summary::after { content: 'menos'; }
+.dica-mais {
   display: flex; gap: var(--e4); flex-wrap: wrap;
-  font-size: .8rem; color: var(--texto-2);
-  background: var(--superficie-2); border: 1px solid var(--borda);
-  border-radius: var(--r-sm); padding: 9px 13px;
+  padding: 8px 0 2px;
 }
 kbd {
   font-family: var(--mono); font-size: .74rem; padding: 1px 6px;

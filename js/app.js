@@ -229,7 +229,12 @@
 
     alvo.innerHTML = '<div class="lista">' + estado.projetos.map(function (p) {
       var aberto = estado.projetoAtivo === p.id;
-      var iniciais = (p.nome || '?').trim().split(/\s+/).slice(0, 2).map(function (x) { return x[0]; }).join('').toUpperCase();
+      /* Só palavras que começam por letra ou número: um nome como
+         "Mineração — exemplo" dava "M—", porque o travessão contava
+         como palavra e virava a segunda inicial. */
+      var iniciais = (p.nome || '?').trim().split(/\s+/)
+        .filter(function (x) { return /^[\p{L}\p{N}]/u.test(x); })
+        .slice(0, 2).map(function (x) { return x[0]; }).join('').toUpperCase() || '?';
       var nUn = p.campanhas.reduce(function (a, c) { return a + c.unidades.length; }, 0);
       var nReg = p.campanhas.reduce(function (a, c) {
         return a + c.unidades.reduce(function (b, u) { return b + (u.registros || []).length; }, 0);
@@ -281,7 +286,7 @@
     var imp = estado.importacao;
     if (!imp || !imp.avisos || !imp.avisos.length) { alvo.innerHTML = ''; return; }
     alvo.innerHTML = '<div class="card"><div class="card-titulo">' +
-      '<h3>O que a importação encontrou em <span class="taxon-sup">' + esc(imp.origem || 'planilha') + '</span></h3>' +
+      '<h3>Inconsistências encontradas na importação</h3>' +
       '<button class="btn btn-fantasma btn-pq" data-acao="limpar-avisos" type="button">Dispensar</button></div>' +
       '<div class="avisos-pilha">' + imp.avisos.map(function (a) { return avisoHtml(esc(a)); }).join('') + '</div></div>';
   }
@@ -830,12 +835,21 @@
       '<button class="btn" id="btn-lancar" type="button">' + icone('ico-mais') + ' Lançar</button>' +
       '</div>' +
       '<div id="atalhos-recentes">' + atalhosHtml(u, mapaTx) + '</div>' +
-      '<div class="dica-teclado nao-imprime" style="margin-top:var(--e3)">' +
-      '<span><kbd>Enter</kbd> lança e já volta pro nome</span>' +
-      '<span>abreviação serve: <code>cerd tho</code></span>' +
-      '<span>quantidade no fim: <code>cerd tho 3</code></span>' +
-      '<span><kbd>↓</kbd><kbd>↑</kbd> trocar na lista · <kbd>Tab</kbd> vai pra quantidade</span>' +
-      '</div></div></div>' +
+      /* Uma linha só, e o resto atrás de um <details>. O bloco anterior tinha
+         quatro instruções abertas no meio do formulário e roubava a atenção
+         do campo que importa. */
+      (function () {
+        var ex = exemploAbreviacao(mapaTx);
+        return '<details class="dica-teclado nao-imprime">' +
+          '<summary><kbd>Enter</kbd> lança · <kbd>↓</kbd><kbd>↑</kbd> escolhe · ' +
+          '<kbd>Tab</kbd> vai pra quantidade</summary>' +
+          '<div class="dica-mais">' +
+          (ex ? '<span>Abreviar funciona: <code>' + esc(ex) + '</code></span>' +
+                '<span>Quantidade no fim: <code>' + esc(ex) + ' 3</code></span>' : '') +
+          '<span>Nome comum também busca.</span>' +
+          '</div></details>' +
+      '</div></div>';
+      })() +
 
       /* tabela de registros */
       '<div class="card"><div class="card-titulo"><h2>Registros de ' + esc(u.codigo) + '</h2>' +
@@ -866,18 +880,35 @@
     return saida;
   }
 
+  /* Quatro atalhos, não oito: com oito a fileira ocupava duas linhas inteiras
+     e competia visualmente com o próprio campo de digitação. Quatro cabem numa
+     linha e cobrem o caso real — repetição da espécie que acabou de sair. */
   function atalhosHtml(u, mapaTx) {
-    var ids = recentesDaUnidade(u, 8);
+    var ids = recentesDaUnidade(u, 4);
     if (!ids.length) return '';
-    return '<div class="atalhos-cx nao-imprime"><span class="atalhos-rot">Últimas lançadas</span>' +
+    return '<div class="atalhos-cx nao-imprime"><span class="atalhos-rot">Repetir</span>' +
       '<div class="atalhos">' + ids.map(function (id) {
         var t = mapaTx[id];
         if (!t) return '';
         return '<button class="atalho" type="button" data-acao="atalho" data-taxon="' + esc(id) + '" ' +
           'title="Lançar 1 indivíduo de ' + esc(M.nomeCientifico(t)) + '">' +
-          '<i class="cientifico">' + esc(M.nomeCientifico(t)) + '</i>' +
-          (t.nomeComum ? '<span class="atalho-comum">' + esc(t.nomeComum) + '</span>' : '') + '</button>';
+          '<i class="cientifico">' + esc(M.nomeCientifico(t)) + '</i></button>';
       }).join('') + '</div></div>';
+  }
+
+  /* Exemplo de abreviação tirado de uma espécie REAL do catálogo em uso.
+     Estava fixo em "cerd tho" (Cerdocyon thous, um mamífero) e aparecia
+     dentro de um projeto de avifauna. */
+  function exemploAbreviacao(mapaTx) {
+    var chaves = Object.keys(mapaTx || {});
+    for (var i = 0; i < chaves.length; i++) {
+      var nome = M.nomeCientifico(mapaTx[chaves[i]]) || '';
+      var partes = nome.split(/\s+/);
+      if (partes.length >= 2 && partes[0].length >= 4 && partes[1].length >= 3) {
+        return partes[0].slice(0, 4).toLowerCase() + ' ' + partes[1].slice(0, 3).toLowerCase();
+      }
+    }
+    return null;
   }
 
   function tabelaRegistros(u, mapaTx) {
