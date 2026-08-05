@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seara Biologia — Levantamento de Fauna</title>
+<meta name="description" content="Levantamento de fauna para licenciamento ambiental: esforço amostral, índices de diversidade, estimadores de riqueza, curva do coletor e laudo A4.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="assets/icone-180.png">
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+<!-- Símbolos reutilizáveis (marca + ícones) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="ico-logo" viewBox="0 0 64 64">
+      <image href="assets/icone-192.png" x="0" y="0" width="64" height="64"/>
+    </symbol>
+    <symbol id="ico-selo" viewBox="0 0 240 240">
+      <image href="assets/selo-240.png" x="0" y="0" width="240" height="240"/>
+    </symbol>
+    <symbol id="ico-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="ico-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="ico-lua" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5z"/></symbol>
+    <symbol id="ico-alerta" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17.4v.1"/></symbol>
+    <symbol id="ico-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.2"/><path d="M12 11v5.5M12 7.6v.1"/></symbol>
+    <symbol id="ico-imprimir" viewBox="0 0 24 24"><path d="M7 9V3h10v6M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M7 14h10v7H7z"/></symbol>
+    <symbol id="ico-lixo" viewBox="0 0 24 24"><path d="M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14"/></symbol>
+    <symbol id="ico-lapis" viewBox="0 0 24 24"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></symbol>
+    <symbol id="ico-baixar" viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></symbol>
+    <symbol id="ico-subir" viewBox="0 0 24 24"><path d="M12 20V8M7 12l5-5 5 5M4 4h16"/></symbol>
+    <symbol id="ico-check" viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6"/></symbol>
+    <symbol id="ico-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="ico-globo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.8 3.8 9S14.5 21.3 12 21c-2.5-2.7-3.8-5.8-3.8-9S9.5 5.7 12 3z"/></symbol>
+    <symbol id="ico-lupa" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></symbol>
+    <symbol id="ico-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+    <!-- Marca da tela vazia: um pássaro sobre o galho, na paleta da casa. -->
+    <symbol id="ico-fauna" viewBox="0 0 96 96">
+      <path d="M14 78h68" stroke="#B4633A" stroke-width="5" stroke-linecap="round" fill="none"/>
+      <path d="M30 78c0-6 3-11 8-13" stroke="#B4633A" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+      <path d="M62 30c-11 0-20 8-21 19-1 8 4 15 12 16 9 1 17-5 19-14 1-5 0-9-2-12l8-5-9-1 2-8-7 5c-1-1-2 0-2 0z" fill="#2D7A4F"/>
+      <path d="M45 46c6-3 13-2 18 3-3 8-11 12-19 10-3-1-5-4-4-7 .6-3 2.6-5 5-6z" fill="#8CC7A4"/>
+      <circle cx="63" cy="34" r="2.4" fill="#123D2A"/>
+      <path d="M41 62c-3 5-8 9-14 11" stroke="#2D7A4F" stroke-width="3" stroke-linecap="round" fill="none"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="topo nao-imprime">
+  <div class="topo-int">
+    <a class="marca" href="#projetos">
+      <svg><use href="#ico-logo"></use></svg>
+      <span>
+        <span class="marca-nome">Seara Biologia</span>
+        <span class="marca-sub">Levantamento de fauna</span>
+      </span>
+    </a>
+    <nav class="nav" id="nav" aria-label="Navegação principal">
+      <a href="#projetos">Projetos</a>
+      <a href="#campanhas">Campanhas</a>
+      <a href="#unidades">Unidades</a>
+      <a href="#registros">Registros</a>
+      <a href="#taxons">Táxons</a>
+      <a href="#resultados">Resultados</a>
+      <a href="#laudo">Laudo</a>
+      <a href="#ajuda" title="Como usar a ferramenta">Como usar</a>
+    </nav>
+    <button class="btn-tema" id="btn-tema" type="button" title="Alternar tema" aria-label="Alternar tema claro/escuro">
+      <svg id="ico-tema"><use href="#ico-lua"></use></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- ============================= 1. PROJETOS ============================ -->
+  <section class="tela" id="tela-projetos" aria-labelledby="t-projetos">
+    <div class="tela-cabec">
+      <div>
+        <h1 id="t-projetos">Projetos</h1>
+        <p>Um projeto por empreendimento. Dentro dele, quantas campanhas o licenciamento pedir.</p>
+      </div>
+      <div class="acoes">
+        <button class="btn btn-fantasma" id="btn-exemplos" type="button"><svg><use href="#ico-fauna"></use></svg> Exemplos</button>
+        <button class="btn btn-sec" id="btn-importar-arquivo" type="button"><svg><use href="#ico-subir"></use></svg> Importar dados</button>
+        <button class="btn btn-sec" id="btn-exportar" type="button"><svg><use href="#ico-baixar"></use></svg> Exportar JSON</button>
+        <button class="btn" id="btn-novo-projeto" type="button"><svg><use href="#ico-mais"></use></svg> Novo projeto</button>
+      </div>
+    </div>
+    <div id="avisos-import" class="avisos-pilha" style="margin-bottom:var(--e4)"></div>
+    <div id="painel-import"></div>
+    <div id="lista-projetos"></div>
+    <input type="file" id="arquivo-import" accept="application/json,.json" hidden>
+    <input type="file" id="arquivo-tabela" accept=".csv,.tsv,.txt,text/csv,text/plain" hidden>
+  </section>
+
+  <!-- ============================ 2. CAMPANHAS =========================== -->
+  <section class="tela" id="tela-campanhas" aria-labelledby="t-campanhas">
+    <div class="tela-cabec">
+      <div>
+        <h1 id="t-campanhas">Campanhas</h1>
+        <p id="sub-campanhas">Sem limite e sem duplicar estrutura — cada campanha carrega as próprias unidades.</p>
+      </div>
+      <div class="acoes">
+        <button class="btn" id="btn-nova-campanha" type="button"><svg><use href="#ico-mais"></use></svg> Nova campanha</button>
+      </div>
+    </div>
+    <div id="campanhas-conteudo"></div>
+  </section>
+
+  <!-- ============================ 3. UNIDADES ============================ -->
+  <section class="tela" id="tela-unidades" aria-labelledby="t-unidades">
+    <div class="tela-cabec">
+      <div>
+        <h1 id="t-unidades">Unidades amostrais</h1>
+        <p id="sub-unidades">Método, geo, ambiente, condições e esforço. O formulário muda conforme o método.</p>
+      </div>
+      <div class="acoes">
+        <button class="btn" id="btn-nova-unidade" type="button"><svg><use href="#ico-mais"></use></svg> Nova unidade</button>
+      </div>
+    </div>
+    <div id="unidades-conteudo"></div>
+  </section>
+
+  <!-- ============================ 4. REGISTROS =========================== -->
+  <section class="tela" id="tela-registros" aria-labelledby="t-registros">
+    <div class="tela-cabec">
+      <div>
+        <h1 id="t-registros">Registros</h1>
+        <p id="sub-registros">Táxon, quantidade e tipo de contato. Feito para digitar rápido, em campo.</p>
+      </div>
+      <div class="acoes">
+        <button class="btn btn-sec" id="btn-csv-registros" type="button"><svg><use href="#ico-baixar"></use></svg> Exportar CSV</button>
+      </div>
+    </div>
+    <div id="registros-conteudo"></div>
+  </section>
+
+  <!-- ============================== 5. TÁXONS ============================ -->
+  <section class="tela" id="tela-taxons" aria-labelledby="t-taxons">
+    <div class="tela-cabec">
+      <div>
+        <h1 id="t-taxons">Táxons e autoecologia</h1>
+        <p>Catálogo de espécies com os atributos do laudo, conferido contra a GBIF.</p>
+      </div>
+      <div class="acoes">
+        <button class="btn btn-sec" id="btn-csv-taxons" type="button"><svg><use href="#ico-baixar"></use></svg> Exportar CSV</button>
+        <button class="btn btn-sec" id="btn-gbif-lote" type="button"><svg><use href="#ico-globo"></use></svg> Verificar na GBIF</button>
+        <button class="btn" id="btn-novo-taxon" type="button"><svg><use href="#ico-mais"></use></svg> Novo táxon</button>
+      </div>
+    </div>
+    <div id="taxons-conteudo"></div>
+  </section>
+
+  <!-- =========================== 6. RESULTADOS =========================== -->
+  <section class="tela" id="tela-resultados" aria-labelledby="t-resultados">
+    <div class="tela-cabec">
+      <div>
+        <h1 id="t-resultados">Resultados</h1>
+        <p id="sub-resultados">Índices, estimadores, curva do coletor e composição — calculados aqui, não colados.</p>
+      </div>
+      <div class="acoes">
+        <button class="btn" id="btn-ir-laudo" type="button"><svg><use href="#ico-imprimir"></use></svg> Gerar laudo</button>
+      </div>
+    </div>
+    <div id="resultados-conteudo"></div>
+  </section>
+
+  <!-- ============================== 7. LAUDO ============================= -->
+  <section class="tela" id="tela-laudo" aria-labelledby="t-laudo">
+    <div class="tela-cabec nao-imprime">
+      <div>
+        <h1 id="t-laudo">Laudo</h1>
+        <p>Pré-visualização A4. Use <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>P</kbd> para imprimir ou salvar em PDF.</p>
+      </div>
+      <div class="acoes">
+        <button class="btn" id="btn-imprimir" type="button"><svg><use href="#ico-imprimir"></use></svg> Imprimir</button>
+      </div>
+    </div>
+    <div id="laudo-conteudo"></div>
+  </section>
+
+  <!-- ============================== 8. AJUDA ============================= -->
+  <section class="tela" id="tela-ajuda" aria-labelledby="t-ajuda">
+    <div class="tela-cabec">
+      <div>
+        <h1 id="t-ajuda">Como usar</h1>
+        <p>O caminho recomendado, o que a ferramenta calcula e o que você precisa conferir antes de assinar.</p>
+      </div>
+    </div>
+
+    <div class="ajuda">
+
+      <section class="cartao">
+        <h2>O fluxo, do começo ao fim</h2>
+        <p>São seis passos, sempre na mesma ordem. Cada um só faz sentido depois do anterior.</p>
+        <ol class="passos">
+          <li>
+            <span class="passo-n">1</span>
+            <div>
+              <h3>Projetos</h3>
+              <p>Cadastre o empreendimento: cliente, município, órgão licenciador, número do processo
+              e o <strong>responsável técnico com registro profissional</strong> — é o que vai na
+              assinatura do laudo.</p>
+              <p class="dica">Um projeto guarda <strong>quantas campanhas você quiser</strong>. Não
+              existe mais “duplicar 12 abas para a segunda campanha”.</p>
+            </div>
+          </li>
+          <li>
+            <span class="passo-n">2</span>
+            <div>
+              <h3>Campanhas</h3>
+              <p>Cada ida a campo é uma campanha, com sazonalidade (chuva ou seca), datas e equipe.
+              São <strong>N campanhas, sem limite</strong>, e a comparação entre elas sai pronta na
+              tela de Resultados.</p>
+            </div>
+          </li>
+          <li>
+            <span class="passo-n">3</span>
+            <div>
+              <h3>Unidades amostrais</h3>
+              <p>Transecto, ponto de escuta, armadilha fotográfica, pitfall, rede de neblina, busca
+              ativa, playback ou rede de pesca. <strong>O formulário muda conforme o método</strong>:
+              transecto pede quilômetro e largura da faixa, armadilha pede número de câmeras e noites,
+              rede pede área e horas.</p>
+              <p><strong>O esforço é obrigatório</strong> e é o que faz o app funcionar para qualquer
+              grupo. Abundância relativa sem esforço não significa nada, e é exatamente o que impedia
+              a planilha de juntar métodos diferentes num mesmo levantamento.</p>
+              <p class="dica">No transecto, a área vem da fórmula herdada da planilha:
+              <code>área (ha) = (km × 1000 × largura em m) ÷ 10.000</code>. A largura é
+              <strong>parâmetro</strong>, não constante: 50 m é só o padrão.</p>
+            </div>
+          </li>
+          <li>
+            <span class="passo-n">4</span>
+            <div>
+              <h3>Registros</h3>
+              <p>Lançamento rápido: comece a digitar o nome científico ou o nome comum e o
+              <strong>autocompletar</strong> acha no catálogo. <kbd>Enter</kbd> salva e devolve o foco
+              para o próximo lançamento, sem tirar a mão do teclado.</p>
+              <p class="dica">Se a espécie ainda não existe no catálogo, o próprio lançador cria o
+              táxon na hora — você completa a autoecologia depois, com calma.</p>
+            </div>
+          </li>
+          <li>
+            <span class="passo-n">5</span>
+            <div>
+              <h3>Táxons e autoecologia</h3>
+              <p>O catálogo de espécies com IUCN, Portaria do MMA, lista estadual, sensibilidade,
+              endemismo, dependência de mata, hábitat, guilda trófica, migratória, cinegética e
+              exótica. É daqui que sai a <em>tabela para laudo</em>.</p>
+              <p>E é aqui que fica o botão <strong>Verificar na GBIF</strong> — veja o quadro abaixo.</p>
+            </div>
+          </li>
+          <li>
+            <span class="passo-n">6</span>
+            <div>
+              <h3>Resultados e laudo</h3>
+              <p>Índices por unidade e por campanha, estimadores de riqueza com intervalo de
+              confiança, curva do coletor, composição por ordem, família e guilda, espécies de
+              interesse e as comparações. O laudo A4 monta tudo isso pronto para assinar.</p>
+              <p class="dica">Use <kbd>Ctrl</kbd>/<kbd>⌘</kbd>&nbsp;+&nbsp;<kbd>P</kbd> e escolha
+              <em>Salvar como PDF</em>. O laudo sempre sai em fundo branco, mesmo com o app no tema escuro.</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="cartao">
+        <h2>O que a ferramenta calcula</h2>
+        <p>A planilha antiga <strong>não calculava nenhum destes números</strong> — as abas
+        <em>Dives</em> e <em>Estimates</em> tinham literalmente escrito “colar aqui os valores”, e
+        você rodava o EstimateS por fora. Agora sai tudo aqui, do mesmo dado.</p>
+        <div class="formulas">
+          <div><b>Riqueza (S)</b> <code>número de espécies</code></div>
+          <div><b>Simpson — dominância (D)</b> <code>Σ ni(ni−1) ÷ N(N−1)</code></div>
+          <div><b>Simpson — diversidade</b> <code>1 − D</code></div>
+          <div><b>Simpson — recíproco</b> <code>1 ÷ D</code></div>
+          <div><b>Equitabilidade de Simpson</b> <code>(1 ÷ D) ÷ S</code></div>
+          <div><b>Shannon (H′)</b> <code>− Σ (pi × ln pi)</code></div>
+          <div><b>Equitabilidade de Pielou (J′)</b> <code>H′ ÷ ln(S)</code></div>
+          <div><b>Densidade</b> <code>indivíduos ÷ esforço</code></div>
+          <div><b>Abundância relativa</b> <code>ni ÷ N</code></div>
+          <div><b>Frequência de ocorrência</b> <code>unidades onde ocorre ÷ total de unidades</code></div>
+          <div><b>Chao 1</b> <code>S + F1² ÷ (2·F2)</code></div>
+          <div><b>Chao 1 corrigido</b> <code>S + F1(F1−1) ÷ (2(F2+1))</code></div>
+          <div><b>Chao 2</b> <code>S + Q1² ÷ (2·Q2)</code></div>
+          <div><b>Chao 2 corrigido</b> <code>S + ((m−1)÷m) · Q1(Q1−1) ÷ (2(Q2+1))</code></div>
+          <div><b>Jackknife 1</b> <code>S + Q1 · (m−1) ÷ m</code></div>
+          <div><b>Jackknife 2</b> <code>S + Q1(2m−3)÷m − Q2(m−2)² ÷ (m(m−1))</code></div>
+          <div><b>Bootstrap</b> <code>S + Σ (1 − pk)^m</code></div>
+          <div><b>Curva do coletor</b> <code>E[Sn] = Σ [ 1 − C(N−ni, n) ÷ C(N, n) ]</code></div>
+        </div>
+        <p style="margin-top:var(--e3)"><strong>F1</strong> e <strong>F2</strong> são as espécies com
+        1 e 2 <em>indivíduos</em>; <strong>Q1</strong> e <strong>Q2</strong>, as que ocorrem em 1 e 2
+        <em>unidades amostrais</em>; <strong>m</strong> é o número de unidades. O Chao 1 troca
+        sozinho para a forma corrigida quando F2 = 0, porque a clássica dividiria por zero — e o app
+        avisa na tela quando isso acontece.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Sobre o intervalo de confiança</h2>
+        <p>O intervalo de 95 % dos estimadores é o <strong>intervalo log-normal de Chao</strong> —
+        o mesmo que o EstimateS usa. É o padrão da área, e é o que torna o número defensável
+        perante o órgão ambiental:</p>
+        <div class="formulas">
+          <div><b>K</b> <code>exp( 1,96 × √( ln( 1 + V̂ ÷ (Ŝ − S<sub>obs</sub>)² ) ) )</code></div>
+          <div><b>IC 95 %</b> <code>[ S<sub>obs</sub> + (Ŝ − S<sub>obs</sub>) ÷ K ; S<sub>obs</sub> + (Ŝ − S<sub>obs</sub>) × K ]</code></div>
+        </div>
+        <p style="margin-top:var(--e3)">Ele é <strong>assimétrico</strong>, como tem que ser — a
+        incerteza sobre quantas espécies faltam é maior para cima — e por construção
+        <strong>nunca exclui a estimativa pontual</strong>, que era o defeito do intervalo por
+        percentil de bootstrap.</p>
+
+        <h3>De onde vem cada variância</h3>
+        <p>Nenhuma foi escrita de memória. Cada uma tem fonte primária, e o arquivo
+        <code>testes.html</code> confere todas contra um exemplo publicado com resultado
+        conhecido — a saída do pacote R <code>vegan</code> para os conjuntos <code>dune</code> e
+        <code>BCI</code>, e o exemplo de Heltshe &amp; Forrester reimpresso em Krebs.</p>
+        <ul class="lista-aviso">
+          <li><strong>IC log-normal</strong> — Chao, A. 1987, <em>Biometrics</em> 43:783–791,
+          eqs. (11)–(12), p. 787. A transformação logarítmica é atribuída por Chao a K. Burnham
+          (comunicação pessoal).</li>
+          <li><strong>Var(Chao 1)</strong> — Chao (1987), p. 786. Atenção: Chao (1984)
+          <em>não</em> traz variância analítica, e a eq. 10 de Colwell &amp; Coddington (1994)
+          reproduz a fórmula com erro de tipografia — o próprio Colwell registra a errata no guia
+          do EstimateS.</li>
+          <li><strong>Var(Chao 1 e Chao 2 corrigidos)</strong> — EstimateS 9.1.0 User’s Guide,
+          Appendix B, eq. 6 (quando F2 &gt; 0) e eq. 7 (quando F2 = 0, em que a forma clássica
+          dividiria por zero).</li>
+          <li><strong>Var(Chao 2)</strong> — Chao &amp; Colwell 2017, <em>SORT</em> 41(1):3–54,
+          eq. (3a).</li>
+          <li><strong>Var(Jackknife 1)</strong> — Heltshe &amp; Forrester 1983,
+          <em>Biometrics</em> 39:1–11, na forma reimpressa por Colwell &amp; Coddington (1994),
+          eq. (12), e por Krebs, <em>Ecological Methodology</em>, eq. (13.4).</li>
+          <li><strong>Var(Bootstrap)</strong> — Smith &amp; van Belle 1984, <em>Biometrics</em>
+          40:119–129.</li>
+        </ul>
+
+        <h3>O que fica sem intervalo, e por quê</h3>
+        <ul class="lista-aviso">
+          <li><strong>Jackknife 2.</strong> Não existe variância analítica publicada para o
+          jackknife de segunda ordem — a documentação do <code>vegan::specpool</code> registra a
+          lacuna com todas as letras. O app mostra a estimativa e diz na própria célula que não
+          há IC. <strong>Melhor faltar o intervalo do que inventar a variância.</strong></li>
+          <li><strong>Riqueza observada (S).</strong> É contagem, não estimativa: não há erro de
+          amostragem a estimar em cima do que já foi visto.</li>
+          <li>Quando a estimativa <strong>coincide com a riqueza observada</strong> (por exemplo,
+          Q1 = 0), a transformação logarítmica divide por zero e o intervalo não existe. O app
+          diz isso em vez de mostrar um traço mudo.</li>
+        </ul>
+
+        <h3>Duas divergências que você precisa saber que existem</h3>
+        <ul class="lista-aviso">
+          <li>No <strong>Jackknife 1</strong>, o <code>vegan</code> subtrai <code>Q1 ÷ m</code> e a
+          literatura (Heltshe &amp; Forrester, Colwell &amp; Coddington, Krebs) subtrai
+          <code>Q1² ÷ m</code>. Seguimos a literatura, que é o que fecha com o exemplo numérico
+          publicado por Krebs (Box 13.2 → 4,05).</li>
+          <li>No <strong>Chao 1 corrigido</strong>, o <code>vegan</code> recusa a fórmula do
+          EstimateS e usa uma derivação própria, não publicada como tal. Em <code>BCI[1,]</code>
+          as duas dão erro-padrão 11,5854 e 11,5838 — 0,014 % de diferença. Seguimos o EstimateS,
+          que é a referência que o órgão conhece.</li>
+        </ul>
+
+        <p><strong>A curva do coletor é o único lugar que ainda usa bootstrap</strong> (200
+        repetições, semente fixa — o mesmo dado devolve sempre o mesmo intervalo, hoje e daqui a
+        dois anos). A tracejada cinza ao lado dela é a <strong>curva de Coleman</strong>,
+        <code>E(s*) = Σ [1 − (1 − n* ÷ N)<sup>n<sub>i</sub></sup>]</code> — Gotelli &amp; Colwell
+        (2011), cap. 4, eq. (4.1) — que aproxima a rarefação e fica sempre um pouco abaixo dela.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>A verificação na GBIF</h2>
+        <p>A GBIF é a base taxonômica internacional. O app consulta
+        <code>api.gbif.org/v1/species/match</code> — sem chave, sem cadastro, de graça — e compara o
+        que voltou com o que está no seu catálogo.</p>
+        <p><strong>A regra de ouro: a API sugere, nunca sobrescreve.</strong> Cada divergência vira
+        um card com <em>Aceitar</em> e <em>Recusar</em>. Nada muda no seu dado sem você mandar. A
+        assinatura do laudo é sua, não da API.</p>
+        <div class="ajuda-grade">
+          <div>
+            <h3>Erro de digitação</h3>
+            <p>Quando o nome difere do da GBIF por uma ou duas letras, o app diz que é
+            <strong>provável erro de digitação</strong>. Foi assim que <em>Furariidae</em> apareceu
+            como <em>Furnariidae</em> — dez espécies, e o erro já tinha ido para um laudo.</p>
+          </div>
+          <div>
+            <h3>Sinônimo</h3>
+            <p>Quando a GBIF trata o nome como sinônimo, ela mostra o <strong>nome aceito</strong>.
+            Se a espécie nem consta da espinha dorsal, o app procura nas outras listas taxonômicas —
+            é assim que <em>Hydropsalis parvula</em> aparece como <em>Setopagis parvula</em>.</p>
+          </div>
+          <div>
+            <h3>Divergência real</h3>
+            <p>Diferença grande de família ou ordem <strong>não é erro</strong>: costuma ser
+            desacordo entre autores, como desmembrar Rhynchocyclidae de Tyrannidae. O app mostra as
+            duas e deixa você escolher.</p>
+          </div>
+          <div>
+            <h3>Sem internet</h3>
+            <p>Se a rede cair, <strong>o app continua inteiro</strong> — só a verificação fica
+            indisponível, com aviso na tela. O resultado da última verificação de cada espécie fica
+            guardado e continua aparecendo offline.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="cartao">
+        <h2>Trazendo a planilha para cá</h2>
+        <p>Ler <code>.xlsx</code> dentro do navegador exigiria uma biblioteca externa, e este app é
+        de <strong>zero dependências</strong> por decisão de projeto. Então a conversão acontece uma
+        vez, fora do navegador, com o script <code>importar.py</code>:</p>
+        <div class="formulas">
+          <div><code>python3 importar.py "Mineração Planalto.xlsx" -o planalto.json</code></div>
+        </div>
+        <p style="margin-top:var(--e3)">Depois é só <strong>Projetos → Importar JSON</strong>. O
+        script devolve na tela quantas espécies, famílias, ordens e unidades entraram, mais os avisos
+        do que ele encontrou de estranho — espécie que aparece na ficha de campo mas não na
+        autoecologia, transecto sem comprimento, campanha em branco.</p>
+        <p class="dica">Um detalhe da planilha que o script trata: na aba
+        <em>Autoecologia</em>, <strong>ordem e família só aparecem na primeira espécie de cada
+        grupo</strong> e ficam zeradas nas seguintes. É agrupamento visual do Excel — o script
+        arrasta o último valor válido para baixo.</p>
+      </section>
+
+      <section class="cartao">
+        <h2>Antes de assinar</h2>
+        <ul class="lista-aviso">
+          <li><strong>A Portaria MMA 444/2014 foi substituída pela 148/2022.</strong> A planilha
+          antiga usava a 444. Lista desatualizada em laudo oficial é passivo — confira qual é a
+          vigente antes de entregar.</li>
+          <li><strong>A API da IUCN proíbe uso comercial</strong>, e consultoria remunerada é uso
+          comercial (a alternativa deles, o IBAT, é paga). Por isso o app não consulta a IUCN: a
+          categoria é digitada por você, como referência. As listas com <strong>força legal</strong>
+          no laudo brasileiro são a Portaria do MMA e a estadual — atos normativos públicos.</li>
+          <li><strong>Sem esforço não há densidade.</strong> Unidade sem esforço preenchido aparece
+          marcada em terracota e fica de fora dos cálculos que dependem dele. O app prefere avisar a
+          devolver um número sem sentido.</li>
+          <li><strong>Estimador não é riqueza.</strong> Chao, Jackknife e Bootstrap estimam quantas
+          espécies existem na área, não quantas você viu. Quando os estimadores ficam muito acima da
+          riqueza observada, o recado é que o esforço foi insuficiente.</li>
+        </ul>
+      </section>
+
+      <section class="cartao">
+        <h2>Onde ficam os dados</h2>
+        <p>Tudo é salvo <strong>no próprio navegador</strong>, neste aparelho. Não vai para servidor
+        nenhum e funciona sem internet depois de abrir a primeira vez — só a verificação na GBIF
+        precisa de rede.</p>
+        <p><strong>A consequência disso:</strong> os dados não passam do celular para o computador
+        sozinhos, e limpar os dados de navegação apaga tudo. Exporte o <strong>JSON</strong> de tempos
+        em tempos na tela de Projetos — é o seu backup, e é ele que leva os dados de um aparelho ao outro.</p>
+      </section>
+
+    </div>
+  </section>
+</main>
+
+<!-- Modal genérico -->
+<div class="modal-fundo" id="modal-fundo" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-titulo" id="modal">
+    <h2 id="modal-titulo"></h2>
+    <form id="modal-form"><div class="grade" id="modal-campos"></div>
+      <div class="modal-acoes">
+        <button type="button" class="btn btn-fantasma" id="modal-cancelar">Cancelar</button>
+        <button type="submit" class="btn" id="modal-ok">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/dados.js"></script>
+<script src="js/motor.js"></script>
+<script src="js/graficos.js"></script>
+<script src="js/gbif.js"></script>
+<script src="js/exemplos.js"></script>
+<script src="js/armazenamento.js"></script>
+<script src="js/importador.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

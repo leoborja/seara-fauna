@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fauna — conferência numérica do motor</title>
+<style>
+  :root { color-scheme: light dark; --v:#1B5E3F; --t:#B4633A; }
+  body { font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         margin: 0; padding: 28px 20px 60px; max-width: 1000px; margin-inline: auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; color: var(--v); }
+  p { color: #55635C; margin: 0 0 14px; }
+  #resultado { display:inline-block; padding: 9px 18px; border-radius: 999px; font-weight: 700; margin: 12px 0 20px; }
+  #resultado.bom { background: #DCEDE3; color: #123D2A; }
+  #resultado.ruim { background: #FBF0EA; color: #A2542D; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { padding: 6px 9px; text-align: right; border-bottom: 1px solid #DCE4DE; font-variant-numeric: tabular-nums; }
+  th.esq, td.esq { text-align: left; font-variant-numeric: normal; }
+  thead th { background: #F1F5F2; font-weight: 650; }
+  tr.secao td { background: #1B5E3F; color: #fff; font-weight: 650; text-align: left; padding: 9px; }
+  tr.nota td { color: #83918A; font-size: .82rem; font-style: italic; border-bottom: none; padding-top: 2px; }
+  tr.passa td:first-child { color: #2D7A4F; font-weight: 700; }
+  tr.falha td { background: #FBF0EA; }
+  tr.falha td:first-child { color: #B4633A; font-weight: 700; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: .84rem; }
+  .fontes { margin-top: 28px; font-size: .84rem; color: #55635C; }
+  .fontes li { margin-bottom: 5px; }
+</style>
+</head>
+<body>
+<h1>Conferência numérica do motor</h1>
+<p>Cada variância e o intervalo de confiança são conferidos contra um <strong>exemplo publicado
+com resultado conhecido</strong> — a saída do pacote R <code>vegan</code> para os conjuntos
+<code>dune</code> e <code>BCI</code>, e o exemplo de Heltshe &amp; Forrester reimpresso em Krebs.
+Abra este arquivo sempre que mexer em <code>js/motor.js</code>.</p>
+<div id="resultado">rodando…</div>
+<table>
+  <thead><tr><th></th><th class="esq">Verificação</th><th>Obtido</th><th>Esperado</th><th>Δ</th></tr></thead>
+  <tbody id="corpo"></tbody>
+</table>
+
+<div class="fontes">
+<h2 style="font-size:1rem;color:#1B5E3F">Fontes das fórmulas</h2>
+<ul>
+<li><strong>Var(Chao 1)</strong> — CHAO, A. 1987. <em>Biometrics</em> 43:783–791, p. 786.
+    (Chao 1984 não traz variância analítica; a eq. 10 de Colwell &amp; Coddington 1994 tem erro
+    de tipografia, registrado como errata no guia do EstimateS.)</li>
+<li><strong>Var(Chao 1 corrigido)</strong> — EstimateS 9.1.0 User's Guide, Appendix B, eq. 6
+    (F2 &gt; 0) e eq. 7 (F2 = 0). Mesma de <code>SpadeR::SpecAbunChao1bc</code>.
+    O <code>vegan</code> usa uma derivação própria, 0,014 % diferente em BCI[1,].</li>
+<li><strong>Var(Chao 2)</strong> — CHAO, A. &amp; COLWELL, R. K. 2017. <em>SORT</em> 41(1):3–54,
+    eq. (3a); EstimateS Appendix B eq. 9; <code>vegan::specpool</code>.</li>
+<li><strong>Var(Jackknife 1)</strong> — HELTSHE, J. F. &amp; FORRESTER, N. E. 1983.
+    <em>Biometrics</em> 39:1–11; reimpressa em COLWELL &amp; CODDINGTON 1994 eq. (12) e em
+    KREBS, <em>Ecological Methodology</em>, eq. (13.4).
+    <strong>Divergência declarada:</strong> o <code>vegan::specpool</code> subtrai Q1/m em vez de
+    Q1²/m. Seguimos Heltshe &amp; Forrester, que é o que fecha com o exemplo numérico
+    publicado por Krebs (Box 13.2 → 4,05).</li>
+<li><strong>Var(Jackknife 2)</strong> — <strong>não implementada.</strong> A documentação de
+    <code>vegan::specpool</code> diz que a variância de 2ª ordem "is still missing"; o
+    <code>SpadeR</code> calcula uma por método delta que não está publicada como tal.
+    O jackknife 2 sai <strong>sem intervalo de confiança</strong>, com aviso na tela.</li>
+<li><strong>Var(Bootstrap)</strong> — SMITH, E. P. &amp; VAN BELLE, G. 1984.
+    <em>Biometrics</em> 40:119–129; implementada em <code>vegan::specpool</code> e reimpressa
+    em KREBS eq. (13.12).</li>
+<li><strong>IC 95 % log-normal</strong> — CHAO, A. 1987. <em>Biometrics</em> 43:783–791,
+    eqs. (11)–(12), p. 787 (transformação logarítmica atribuída a K. Burnham, com. pess.);
+    EstimateS Appendix B eq. 13; CHAO &amp; COLWELL 2017 eq. (3c).</li>
+<li><strong>Curva de Coleman</strong> — GOTELLI, N. J. &amp; COLWELL, R. K. 2011.
+    <em>Biological Diversity: Frontiers in Measurement and Assessment</em>, cap. 4, eq. (4.1).</li>
+</ul>
+</div>
+
+<script src="js/motor.js"></script>
+<script>
+
+var M = window.MOTOR;
+var falhas = 0, linhas = [];
+
+function ok(nome, obtido, esperado, tol) {
+  tol = tol || 1e-6;
+  var d = Math.abs(obtido - esperado);
+  var bom = d <= tol;
+  if (!bom) falhas++;
+  linhas.push('<tr class="' + (bom ? 'passa' : 'falha') + '"><td>' + (bom ? '✓' : '✗') + '</td>' +
+    '<td class="esq">' + nome + '</td><td>' + obtido.toFixed(7) + '</td>' +
+    '<td>' + esperado.toFixed(7) + '</td><td>' + d.toExponential(2) + '</td></tr>');
+}
+function titulo(t) { linhas.push('<tr class="secao"><td colspan="5">' + t + '</td></tr>'); }
+function nota(t) { linhas.push('<tr class="nota"><td></td><td colspan="4" class="esq">' + t + '</td></tr>'); }
+
+/* ==========================================================================
+   1. dune, grupo BF (vegan::specpool(dune, Management))
+   3 sites x 30 espécies, matriz de presença publicada.
+   Saída publicada: https://vegandevs.github.io/vegan/reference/specpool.html
+     BF  Species 16  chao 17.19048  chao.se 1.5895675
+                     jack1 19.33333 jack1.se 2.211083  jack2 19.83333
+                     boot 17.74074  boot.se 1.646379   n 3
+   ========================================================================== */
+var BF = [
+  '100101100001000010110000101000',
+  '100011100000000011110000101110',
+  '000000000000010011100010101110'
+].map(function (l) { return l.split('').map(Number); });
+
+/* mapas por unidade no formato do motor */
+var mapas = BF.map(function (linha) {
+  var mp = {};
+  linha.forEach(function (v, i) { if (v) mp['sp' + i] = v; });
+  return mp;
+});
+var inc = M.incidencia(mapas);
+var qq = M.contarQ(inc);
+var S = Object.keys(inc).length, m = mapas.length;
+titulo('dune / grupo BF (vegan::specpool)');
+nota('S=' + S + ' · Q1=' + qq.Q1 + ' · Q2=' + qq.Q2 + ' · m=' + m);
+ok('S observada', S, 16, 0);
+ok('Q1', qq.Q1, 5, 0);
+ok('Q2', qq.Q2, 7, 0);
+
+/* Chao2 COM correção de amostra pequena (a convenção do vegan/EstimateS) */
+var ssc = (m - 1) / m;
+var chao2ssc = S + ssc * qq.Q1 * qq.Q1 / (2 * qq.Q2);
+ok('Chao 2 (com (m-1)/m, como o vegan)', chao2ssc, 17.190476, 1e-5);
+ok('EP do Chao 2 (Chao & Colwell 2017 eq.3a)', Math.sqrt(M.varChao2(qq.Q1, qq.Q2, ssc)), 1.5895675, 1e-6);
+
+ok('Jackknife 1', M.jackknife1(S, qq.Q1, m), 19.333333, 1e-5);
+ok('Jackknife 2', M.jackknife2(S, qq.Q1, qq.Q2, m), 19.833333, 1e-5);
+ok('Bootstrap', M.bootstrapRiqueza(inc, m), 17.740741, 1e-5);
+ok('EP do Bootstrap (Smith & van Belle 1984)',
+   Math.sqrt(M.varBootstrapRiqueza(mapas, inc)), 1.6463786, 1e-6);
+
+/* Jackknife 1: aqui o vegan e Heltshe & Forrester DIVERGEM.
+   vegan (Q1/m):  var = (Σr² − Q1/m)·(m−1)/m = (9 − 5/3)·2/3 = 4.888889 → EP 2.211083
+   H&F  (Q1²/m):  var = (Σr² − Q1²/m)·(m−1)/m = (9 − 25/3)·2/3 = 0.444444 → EP 0.666667  */
+var r = M.unicasPorUnidade(mapas, inc);
+var somaR2 = r.reduce(function (a, x) { return a + x * x; }, 0);
+nota('únicas por unidade = [' + r.join(', ') + '] · Σr² = ' + somaR2);
+ok('Σr² (únicas por unidade)', somaR2, 9, 0);
+ok('EP jack1 — Heltshe & Forrester (implementado)',
+   Math.sqrt(M.varJackknife1(r, qq.Q1, m)), Math.sqrt((9 - 25 / 3) * 2 / 3), 1e-9);
+nota('(o vegan publica 2.211083 aqui, usando Q1/m em vez de Q1²/m — divergência declarada)');
+
+/* ==========================================================================
+   2. Heltshe & Forrester (1983), exemplo reimpresso em
+      KREBS, Ecological Methodology, cap. 13, Box 13.2:
+      n=10 quadrats, s=14, k=5 uniques, f1=3, f2=1
+      var = (9/10)[(1²·3 + 2²·1) − 5²/10] = 0.9 × 4.5 = 4.05
+   ========================================================================== */
+titulo('Heltshe & Forrester 1983 / Krebs Box 13.2');
+var unicas = [1, 1, 1, 2, 0, 0, 0, 0, 0, 0];   // f1=3 quadrats com 1, f2=1 com 2
+ok('Var(Jackknife 1) — Krebs Box 13.2', M.varJackknife1(unicas, 5, 10), 4.05, 1e-9);
+
+/* ==========================================================================
+   3. BCI[1,] (vegan::estimateR)
+      n=448, S_obs=93, f1=31, f2=18
+      S.chao1 = 117.473684 ; se.chao1 = 11.585411 (EstimateS App.B eq.6)
+                              vegan publica 11.583785 (derivação própria)
+   ========================================================================== */
+titulo('BCI[1,] (vegan::estimateR)');
+var F1 = 31, F2 = 18, Sobs = 93;
+var chao1bc = Sobs + F1 * (F1 - 1) / (2 * (F2 + 1));
+ok('Chao 1 bias-corrected', chao1bc, 117.473684, 1e-5);
+var seEs = Math.sqrt(M.varChao1Corrigido(F1, F2, chao1bc));
+ok('EP Chao1-bc — EstimateS App.B eq.6 (implementado)', seEs, 11.585411, 1e-5);
+nota('(o vegan publica 11.583785 pela derivação própria dele — 0,014 % de diferença)');
+
+/* IC log-normal de Chao (1987) eqs. 11-12, com o EP do vegan,
+   para bater com os números que a literatura reporta */
+titulo('IC 95 % log-normal (Chao 1987 eqs. 11-12)');
+var icBCI = M.icLogNormal(93, 117.473684, Math.pow(11.583785, 2));
+ok('BCI[1,] IC inferior', icBCI[0], 103.1388, 1e-3);
+ok('BCI[1,] IC superior', icBCI[1], 152.0763, 1e-3);
+var icBF = M.icLogNormal(16, 17.190476, Math.pow(1.5895675, 2));
+ok('dune BF IC inferior', icBF[0], 16.1639, 1e-3);
+ok('dune BF IC superior', icBF[1], 24.6471, 1e-3);
+nota('K = exp(1,96·√(ln(1 + V̂/(Ŝ−S_obs)²))) — o IC nunca exclui a estimativa pontual.');
+
+/* ==========================================================================
+   4. Curva de Coleman (Gotelli & Colwell 2011, eq. 4.1)
+      Em n* = N a curva tem que devolver S; em n* = 0, zero.
+   ========================================================================== */
+titulo('Curva de Coleman (Gotelli & Colwell 2011 eq. 4.1)');
+var ni = [37, 30, 25, 23, 20, 16, 14, 13, 9, 8, 7, 6, 6, 6, 4, 4, 3, 3, 2, 1, 1, 1, 1];
+var N = ni.reduce(function (a, b) { return a + b; }, 0);
+ok('Coleman em n* = N devolve S', M.colemanSn(ni, N, N), ni.length, 1e-9);
+ok('Coleman em n* = 0 devolve 0', M.colemanSn(ni, N, 0), 0, 1e-12);
+nota('Coleman(N÷2) = ' + M.colemanSn(ni, N, N / 2).toFixed(4) + ' · Mao Tau(N÷2) = ' + M.esperadoSn(ni, N, Math.round(N / 2)).toFixed(4) + ' — Coleman fica abaixo, como esperado.');
+
+document.getElementById('corpo').innerHTML = linhas.join('');
+var r = document.getElementById('resultado');
+r.textContent = falhas ? falhas + ' verificação(ões) FALHARAM' : 'Todas as ' +
+  linhas.filter(function (l) { return l.indexOf('class="passa"') > 0 || l.indexOf('class="falha"') > 0; }).length +
+  ' verificações conferem';
+r.className = falhas ? 'ruim' : 'bom';
+
+</script>
+</body>
+</html>

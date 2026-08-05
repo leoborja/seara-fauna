@@ -1,0 +1,829 @@
+/* ============================================================================
+   Seara Biologia — Fauna — estilo.css
+   Irmão do app de análise de solo: mesma paleta verde-folha + terracota,
+   mesmos tokens, mesmo comportamento de tema e de impressão.
+   Zero dependências, zero CDN.
+
+   REGRA QUE NÃO SE QUEBRA: nada de `text-transform: uppercase` em nome
+   científico, táxon ou notação. A caixa das letras carrega significado —
+   gênero é maiúsculo, epíteto específico é minúsculo, e "Furnariidae" não é
+   "FURNARIIDAE". Isso quebrou o app de solo uma vez; aqui já nasce certo.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ reset */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body, h1, h2, h3, h4, p, figure, blockquote, dl, dd, ul, ol { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+img, svg { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+table { border-collapse: collapse; }
+
+/* ------------------------------------------------------------------ tokens */
+:root {
+  --verde-900: #123D2A;
+  --verde-800: #1B5E3F;
+  --verde-700: #2D7A4F;
+  --verde-600: #3F9264;
+  --verde-500: #58A87A;
+  --verde-300: #9CCDB2;
+  --verde-100: #DCEDE3;
+  --verde-50:  #F1F7F3;
+
+  --terra:      #B4633A;
+  --terra-600:  #A2542D;
+  --terra-300:  #D98A5F;
+  --terra-50:   #FBF0EA;
+
+  --fundo:        #F4F7F5;
+  --superficie:   #FFFFFF;
+  --superficie-2: #F1F5F2;
+  --superficie-3: #E8EFEA;
+  --borda:        #DCE4DE;
+  --borda-forte:  #C3D0C8;
+
+  --texto:   #16211B;
+  --texto-2: #55635C;
+  --texto-3: #83918A;
+  --texto-inv: #FFFFFF;
+
+  --primaria:      var(--verde-800);
+  --primaria-hover: var(--verde-700);
+  --anel: 0 0 0 3px rgba(45, 122, 79, .32);
+
+  --sombra-1: 0 1px 2px rgba(18, 61, 42, .06), 0 1px 3px rgba(18, 61, 42, .05);
+  --sombra-2: 0 2px 4px rgba(18, 61, 42, .05), 0 8px 20px rgba(18, 61, 42, .07);
+  --sombra-3: 0 12px 32px rgba(18, 61, 42, .14);
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px; --e7: 48px;
+
+  --t: 150ms cubic-bezier(.4, 0, .2, 1);
+
+  --fonte: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --verde-900: #E2F1E8;
+    --verde-800: #7FC69C;
+    --verde-700: #6BB98B;
+    --verde-600: #58A87A;
+    --verde-500: #4A9268;
+    --verde-300: #2F6A49;
+    --verde-100: #1D3B2B;
+    --verde-50:  #15271E;
+
+    --terra:     #D9895D;
+    --terra-600: #C4744A;
+    --terra-300: #A2542D;
+    --terra-50:  #2B1C13;
+
+    --fundo:        #0D1310;
+    --superficie:   #151C18;
+    --superficie-2: #1B2420;
+    --superficie-3: #223029;
+    --borda:        #293630;
+    --borda-forte:  #3A4B42;
+
+    --texto:   #E7EFEA;
+    --texto-2: #A6B4AC;
+    --texto-3: #7C8B83;
+    --texto-inv: #0D1310;
+
+    --primaria: var(--verde-800);
+    --primaria-hover: var(--verde-700);
+    --anel: 0 0 0 3px rgba(127, 198, 156, .3);
+
+    --sombra-1: 0 1px 2px rgba(0, 0, 0, .4);
+    --sombra-2: 0 2px 4px rgba(0, 0, 0, .3), 0 8px 20px rgba(0, 0, 0, .35);
+    --sombra-3: 0 12px 32px rgba(0, 0, 0, .5);
+  }
+}
+
+:root[data-tema="escuro"] {
+  --verde-900: #E2F1E8;
+  --verde-800: #7FC69C;
+  --verde-700: #6BB98B;
+  --verde-600: #58A87A;
+  --verde-500: #4A9268;
+  --verde-300: #2F6A49;
+  --verde-100: #1D3B2B;
+  --verde-50:  #15271E;
+
+  --terra:     #D9895D;
+  --terra-600: #C4744A;
+  --terra-300: #A2542D;
+  --terra-50:  #2B1C13;
+
+  --fundo:        #0D1310;
+  --superficie:   #151C18;
+  --superficie-2: #1B2420;
+  --superficie-3: #223029;
+  --borda:        #293630;
+  --borda-forte:  #3A4B42;
+
+  --texto:   #E7EFEA;
+  --texto-2: #A6B4AC;
+  --texto-3: #7C8B83;
+  --texto-inv: #0D1310;
+
+  --primaria: var(--verde-800);
+  --primaria-hover: var(--verde-700);
+  --anel: 0 0 0 3px rgba(127, 198, 156, .3);
+
+  --sombra-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --sombra-2: 0 2px 4px rgba(0, 0, 0, .3), 0 8px 20px rgba(0, 0, 0, .35);
+  --sombra-3: 0 12px 32px rgba(0, 0, 0, .5);
+}
+
+/* ------------------------------------------------------------------- base */
+body {
+  font-family: var(--fonte);
+  background: var(--fundo);
+  color: var(--texto);
+  line-height: 1.55;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;          /* a página nunca rola de lado; as tabelas sim */
+}
+
+h1, h2, h3, h4 { line-height: 1.2; letter-spacing: -.02em; font-weight: 650; color: var(--texto); }
+h1 { font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); }
+h2 { font-size: clamp(1.2rem, 1.05rem + .6vw, 1.5rem); }
+h3 { font-size: 1.05rem; }
+a { color: var(--verde-700); }
+
+:focus-visible { outline: 2px solid var(--verde-600); outline-offset: 2px; }
+
+.num, td.num, th.num, .tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+/* ============================================================================
+   NOME CIENTÍFICO — itálico, como manda a nomenclatura binomial.
+   `text-transform: none` é declarado de propósito e não deve sair daqui:
+   é a trava contra qualquer regra ancestral que tente aplicar caixa-alta.
+   ========================================================================== */
+.cientifico, .taxon-nome, i.sp {
+  font-style: italic;
+  text-transform: none !important;
+  font-variant-caps: normal;
+}
+.cientifico-autor { font-style: normal; color: var(--texto-3); font-weight: 500; }
+/* Ordem, família e demais táxons acima de gênero NÃO vão em itálico, mas
+   também nunca em caixa-alta. */
+.taxon-sup { text-transform: none; }
+
+/* --------------------------------------------------------------- cabeçalho */
+.topo {
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in srgb, var(--superficie) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--borda);
+}
+.topo-int {
+  max-width: 1240px; margin: 0 auto;
+  padding: var(--e3) var(--e5);
+  display: flex; align-items: center; gap: var(--e5); flex-wrap: wrap;
+}
+.marca { display: flex; align-items: center; gap: var(--e3); text-decoration: none; color: inherit; }
+.marca svg { width: 34px; height: 34px; flex: none; }
+.marca-nome { font-weight: 700; font-size: 1.02rem; letter-spacing: -.02em; line-height: 1.1; }
+.marca-sub { font-size: .72rem; color: var(--texto-3); letter-spacing: .09em; text-transform: uppercase; font-weight: 600; }
+
+.nav { display: flex; gap: 2px; margin-left: auto; background: var(--superficie-2); padding: 4px; border-radius: 999px; border: 1px solid var(--borda); }
+.nav a {
+  display: block; padding: 7px 13px; border-radius: 999px;
+  text-decoration: none; color: var(--texto-2); font-weight: 550; font-size: .86rem;
+  transition: background var(--t), color var(--t);
+  white-space: nowrap;
+}
+.nav a:hover { color: var(--texto); background: var(--superficie-3); }
+.nav a[aria-current="page"] { background: var(--primaria); color: var(--texto-inv); box-shadow: var(--sombra-1); }
+
+.btn-tema {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid var(--borda); background: var(--superficie);
+  display: grid; place-items: center; cursor: pointer;
+  transition: background var(--t), border-color var(--t), transform var(--t);
+}
+.btn-tema:hover { background: var(--superficie-2); border-color: var(--borda-forte); }
+.btn-tema:active { transform: scale(.94); }
+.btn-tema svg { width: 18px; height: 18px; stroke: var(--texto-2); fill: none; stroke-width: 1.8; }
+
+/* ------------------------------------------------------------------- layout */
+main { max-width: 1240px; margin: 0 auto; padding: var(--e6) var(--e5) var(--e7); }
+.tela { display: none; animation: entra .22s ease; }
+.tela.ativa { display: block; }
+@keyframes entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+.tela-cabec {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--e4); flex-wrap: wrap; margin-bottom: var(--e5);
+}
+.tela-cabec p { color: var(--texto-2); margin-top: 2px; font-size: .93rem; }
+.acoes { display: flex; gap: var(--e2); flex-wrap: wrap; }
+
+/* trilha de contexto: projeto › campanha › unidade */
+.trilha {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: .84rem; color: var(--texto-2); margin-bottom: var(--e4);
+  background: var(--superficie-2); border: 1px solid var(--borda);
+  border-radius: 999px; padding: 6px var(--e4); width: fit-content; max-width: 100%;
+}
+.trilha b { color: var(--texto); font-weight: 640; }
+.trilha .sep { color: var(--texto-3); }
+
+/* ------------------------------------------------------------------- cards */
+.card {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sombra-1);
+  padding: var(--e5);
+}
+.card + .card { margin-top: var(--e4); }
+.card-titulo { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); margin-bottom: var(--e4); flex-wrap: wrap; }
+.card-titulo h2, .card-titulo h3 { margin: 0; }
+.card-nota { color: var(--texto-2); font-size: .87rem; }
+
+.grade { display: grid; gap: var(--e4); }
+.grade-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.grade-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.grade-4 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+
+/* ------------------------------------------------------------------ botões */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 9px 16px; border-radius: var(--r-sm);
+  border: 1px solid transparent; background: var(--primaria); color: var(--texto-inv);
+  font-weight: 600; font-size: .89rem; cursor: pointer; text-decoration: none;
+  transition: background var(--t), box-shadow var(--t), transform var(--t), border-color var(--t);
+  white-space: nowrap;
+}
+.btn:hover { background: var(--primaria-hover); box-shadow: var(--sombra-2); }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.btn-sec { background: var(--superficie); color: var(--texto); border-color: var(--borda-forte); }
+.btn-sec:hover { background: var(--superficie-2); border-color: var(--verde-600); box-shadow: var(--sombra-1); }
+.btn-fantasma { background: transparent; color: var(--texto-2); border-color: transparent; }
+.btn-fantasma:hover { background: var(--superficie-2); color: var(--texto); box-shadow: none; }
+.btn-perigo { background: transparent; color: var(--terra); border-color: transparent; }
+.btn-perigo:hover { background: var(--terra-50); color: var(--terra-600); box-shadow: none; }
+.btn-terra { background: var(--terra); color: #fff; }
+.btn-terra:hover { background: var(--terra-600); }
+.btn-pq { padding: 5px 11px; font-size: .81rem; }
+.btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ------------------------------------------------------------------ campos */
+.campo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+/* Sem uppercase: os rótulos trazem nome de família, m²·h, ind/ha — a caixa
+   das letras faz parte da notação. A hierarquia vem do peso e da cor. */
+.campo > label, .rotulo {
+  font-size: .78rem; font-weight: 650; color: var(--texto-2);
+  letter-spacing: .02em; text-transform: none;
+}
+.campo .dica-campo { font-size: .76rem; color: var(--texto-3); line-height: 1.4; }
+input[type="text"], input[type="number"], input[type="date"], input[type="time"],
+input[type="search"], select, textarea {
+  width: 100%; padding: 9px 11px;
+  background: var(--superficie);
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--r-sm);
+  transition: border-color var(--t), box-shadow var(--t), background var(--t);
+  font-variant-numeric: tabular-nums;
+}
+input:hover, select:hover, textarea:hover { border-color: var(--verde-500); }
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--verde-600); box-shadow: var(--anel);
+}
+textarea { resize: vertical; min-height: 78px; line-height: 1.5; }
+select {
+  appearance: none; -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--texto-3) 50%), linear-gradient(135deg, var(--texto-3) 50%, transparent 50%);
+  background-position: calc(100% - 17px) calc(50% + 1px), calc(100% - 12px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+  padding-right: 32px;
+}
+.campo-unidade { position: relative; }
+.campo-unidade .sufixo {
+  position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+  font-size: .8rem; color: var(--texto-3); pointer-events: none; font-weight: 600;
+}
+.campo-unidade input { padding-right: 62px; }
+
+.segmentado { display: inline-flex; background: var(--superficie-2); border: 1px solid var(--borda); border-radius: var(--r-sm); padding: 3px; gap: 2px; flex-wrap: wrap; }
+.segmentado button {
+  border: 0; background: transparent; color: var(--texto-2);
+  padding: 6px 13px; border-radius: 6px; cursor: pointer; font-size: .84rem; font-weight: 600;
+  transition: background var(--t), color var(--t);
+}
+.segmentado button:hover { color: var(--texto); }
+.segmentado button[aria-pressed="true"] { background: var(--superficie); color: var(--verde-800); box-shadow: var(--sombra-1); }
+
+/* ------------------------------------------------------------------ tabelas */
+.tabela-envolve { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--borda); border-radius: var(--r-md); background: var(--superficie); }
+table.tabela { width: 100%; font-size: .87rem; font-variant-numeric: tabular-nums; }
+table.tabela th, table.tabela td { padding: 8px 11px; text-align: right; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+table.tabela th:first-child, table.tabela td:first-child { text-align: left; }
+table.tabela th.esq, table.tabela td.esq { text-align: left; }
+table.tabela thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--superficie-2); color: var(--texto-2);
+  /* idem: os cabeçalhos trazem H', J', 1−D, ind/ha — uppercase falsearia */
+  font-size: .74rem; font-weight: 700; letter-spacing: .02em; text-transform: none;
+  border-bottom: 1px solid var(--borda-forte);
+}
+table.tabela thead th small { display: block; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--texto-3); font-size: .92em; }
+table.tabela tbody tr:hover { background: var(--verde-50); }
+table.tabela tbody tr:last-child td { border-bottom: 0; }
+table.tabela tr.linha-total { background: var(--verde-100); font-weight: 650; }
+table.tabela tr.linha-total:hover { background: var(--verde-100); }
+table.tabela tr.linha-total td { border-top: 2px solid var(--verde-600); color: var(--verde-900); }
+table.tabela td.acoes-cel { text-align: right; white-space: nowrap; }
+table.tabela .quebra { white-space: normal; min-width: 12rem; }
+
+/* ---------------------------------------------------------- listas / itens */
+.lista { display: grid; gap: var(--e3); }
+.item {
+  display: flex; align-items: center; gap: var(--e4);
+  background: var(--superficie); border: 1px solid var(--borda);
+  border-radius: var(--r-md); padding: var(--e4);
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.item:hover { border-color: var(--verde-500); box-shadow: var(--sombra-2); }
+.item.ativo { border-color: var(--verde-600); box-shadow: var(--anel); }
+.item-corpo { flex: 1; min-width: 0; }
+.item-corpo h3 { font-size: 1rem; margin-bottom: 2px; }
+.item-meta { font-size: .84rem; color: var(--texto-2); display: flex; gap: var(--e3); flex-wrap: wrap; }
+.item-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.item-acoes { display: flex; gap: 4px; flex: none; }
+
+.avatar {
+  width: 42px; height: 42px; border-radius: var(--r-md); flex: none;
+  display: grid; place-items: center; font-weight: 700; font-size: .95rem;
+  background: var(--verde-100); color: var(--verde-800);
+}
+
+.sub-lista { margin-top: var(--e3); padding-left: var(--e5); display: grid; gap: var(--e2); border-left: 2px solid var(--borda); }
+.sub-item {
+  display: flex; align-items: center; gap: var(--e3);
+  padding: 10px var(--e3); border-radius: var(--r-sm);
+  border: 1px solid var(--borda); background: var(--superficie);
+  transition: border-color var(--t), background var(--t); flex-wrap: wrap;
+}
+.sub-item:hover { border-color: var(--verde-500); background: var(--verde-50); }
+.sub-item.ativo { border-color: var(--verde-600); background: var(--verde-50); }
+.sub-item .titulo { font-weight: 600; font-size: .92rem; }
+.sub-item .meta { font-size: .8rem; color: var(--texto-2); }
+
+/* ------------------------------------------------------------------ badges */
+.tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: .74rem; font-weight: 650; letter-spacing: .02em;
+  background: var(--superficie-3); color: var(--texto-2); border: 1px solid var(--borda);
+  text-transform: none;                 /* IUCN, VU, EN, CR já vêm como devem */
+}
+.tag-verde { background: var(--verde-100); color: var(--verde-800); border-color: transparent; }
+.tag-terra { background: var(--terra-50); color: var(--terra-600); border-color: transparent; }
+
+.aviso {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 11px 14px; border-radius: var(--r-sm);
+  background: var(--terra-50); color: var(--terra-600);
+  border: 1px solid color-mix(in srgb, var(--terra) 28%, transparent);
+  font-size: .86rem; line-height: 1.45;
+}
+.aviso svg { width: 16px; height: 16px; flex: none; margin-top: 2px; stroke: currentColor; fill: none; stroke-width: 2; }
+.aviso-info { background: var(--verde-50); color: var(--verde-800); border-color: color-mix(in srgb, var(--verde-600) 26%, transparent); }
+.avisos-pilha { display: grid; gap: var(--e2); }
+
+/* ------------------------------------------------------------ números-chave */
+.painel-num { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: var(--e3); }
+.num-cx {
+  background: var(--superficie); border: 1px solid var(--borda);
+  border-radius: var(--r-md); padding: var(--e4); position: relative; overflow: hidden;
+}
+.num-cx::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--verde-600); }
+.num-cx.terra::before { background: var(--terra); }
+.num-cx b {
+  display: block; font-size: 1.7rem; font-weight: 700; letter-spacing: -.03em;
+  color: var(--verde-800); font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.num-cx.terra b { color: var(--terra); }
+.num-cx small { display: block; font-size: .76rem; color: var(--texto-2); font-weight: 620; text-transform: none; margin-top: 2px; }
+.num-cx .ic { display: block; font-size: .72rem; color: var(--texto-3); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ gráficos */
+.grafico { width: 100%; height: auto; }
+.grafico text { font-family: var(--fonte); fill: var(--texto); }
+.g-rotulo { font-size: 13px; font-weight: 620; fill: var(--texto); }
+.g-valor { font-size: 12.5px; font-weight: 640; fill: var(--texto); font-variant-numeric: tabular-nums; }
+.g-micro { font-size: 10.5px; fill: var(--texto-3); font-weight: 550; }
+.g-num-grande { font-size: 21px; font-weight: 700; fill: var(--texto); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.grafico-vazio {
+  padding: var(--e5); text-align: center; color: var(--texto-3); font-size: .88rem;
+  border: 1px dashed var(--borda-forte); border-radius: var(--r-md); background: var(--superficie-2);
+}
+
+/* ------------------------------------------------------------- estado vazio */
+.vazio {
+  text-align: center; padding: var(--e7) var(--e5);
+  border: 1.5px dashed var(--borda-forte); border-radius: var(--r-lg);
+  background: var(--superficie);
+}
+.vazio svg { width: 76px; height: 76px; margin: 0 auto var(--e4); opacity: .9; }
+.vazio h3 { margin-bottom: 6px; }
+.vazio p { color: var(--texto-2); max-width: 46ch; margin: 0 auto var(--e4); font-size: .93rem; }
+
+/* ------------------------------------------------------------------- modal */
+.modal-fundo {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(12, 24, 18, .5); backdrop-filter: blur(3px);
+  display: grid; place-items: center; padding: var(--e4);
+  animation: entra .16s ease;
+}
+.modal-fundo[hidden] { display: none; }
+.modal {
+  background: var(--superficie); border-radius: var(--r-xl);
+  box-shadow: var(--sombra-3); border: 1px solid var(--borda);
+  width: min(620px, 100%); max-height: 90vh; overflow: auto; padding: var(--e5);
+}
+.modal h2 { margin-bottom: var(--e4); }
+.modal .grade { margin-bottom: var(--e5); }
+.modal-acoes { display: flex; justify-content: flex-end; gap: var(--e2); flex-wrap: wrap; }
+
+/* -------------------------------------------------------------------- toast */
+.toast {
+  position: fixed; bottom: var(--e5); left: 50%; transform: translateX(-50%) translateY(12px);
+  background: var(--verde-900); color: var(--fundo);
+  padding: 11px 20px; border-radius: 999px; box-shadow: var(--sombra-3);
+  font-size: .88rem; font-weight: 600; z-index: 95;
+  opacity: 0; pointer-events: none; transition: opacity var(--t), transform var(--t);
+  max-width: calc(100vw - 32px); text-align: center;
+}
+:root[data-tema="escuro"] .toast, :root:not([data-tema="claro"]) .toast { color: var(--texto-inv); }
+.toast.mostra { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============================================================================
+   LANÇAMENTO RÁPIDO DE REGISTROS
+   O João lança dezenas de linhas seguidas no campo. Tem que ser rápido de
+   digitar: autocompletar de espécie, Enter salva, foco volta pro nome.
+   ========================================================================== */
+.lancador {
+  background: var(--verde-50); border: 1px solid var(--verde-300);
+  border-radius: var(--r-lg); padding: var(--e4);
+}
+.lancador-grade {
+  display: grid; gap: var(--e3);
+  grid-template-columns: minmax(220px, 2.4fr) 92px minmax(130px, 1fr) auto;
+  align-items: end;
+}
+.auto-cx { position: relative; }
+.auto-lista {
+  position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 4px);
+  background: var(--superficie); border: 1px solid var(--borda-forte);
+  border-radius: var(--r-md); box-shadow: var(--sombra-3);
+  max-height: 300px; overflow-y: auto; padding: 4px;
+}
+.auto-lista[hidden] { display: none; }
+.auto-item {
+  padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer;
+  display: flex; align-items: baseline; gap: var(--e2); flex-wrap: wrap;
+}
+.auto-item:hover, .auto-item.selecionado { background: var(--verde-100); }
+.auto-item .sp { font-weight: 620; }
+.auto-item .comum { font-size: .82rem; color: var(--texto-2); }
+.auto-item .fam { font-size: .74rem; color: var(--texto-3); margin-left: auto; text-transform: none; }
+.auto-vazio { padding: 10px; font-size: .84rem; color: var(--texto-2); }
+
+/* Rodapé de fonte bibliográfica: fica legível mas não compete com o número.
+   Nome de periódico em itálico — e nunca uppercase em notação. */
+.fonte { font-size: .78rem; line-height: 1.5; color: var(--texto-3); text-transform: none; }
+.fonte i { font-style: italic; }
+.fonte strong { color: var(--texto-2); }
+.fonte sub { font-size: .82em; }
+.sem-ic { color: var(--texto-3); font-size: .8rem; line-height: 1.35; }
+
+/* Atalhos das últimas espécies lançadas nesta unidade.
+   Em armadilha fotográfica a mesma espécie volta o dia inteiro — um toque
+   lança um indivíduo sem digitar nada. */
+.atalhos-cx { margin-top: var(--e3); }
+.atalhos { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; }
+.atalhos-rot {
+  display: block; font-size: .76rem; color: var(--texto-2); font-weight: 620;
+  margin-bottom: 6px;
+}
+.atalho {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  background: var(--superficie); border: 1px solid var(--verde-300);
+  color: var(--texto); font: inherit; font-size: .82rem; line-height: 1.35;
+  max-width: 100%; text-align: left;
+}
+.atalho:hover, .atalho:focus-visible { background: var(--verde-100); border-color: var(--verde-600); }
+/* nome científico dentro do atalho: itálico sempre, caixa jamais alterada */
+.atalho .cientifico { font-style: italic; text-transform: none !important; }
+.atalho-comum { font-size: .74rem; color: var(--texto-3); }
+
+/* No celular os atalhos viram uma faixa que rola sozinha. Empilhados, oito
+   deles empurravam o teclado e a tabela para fora da tela — e quem rola é a
+   faixa, nunca a página. */
+@media (max-width: 640px) {
+  .atalhos { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+             padding-bottom: 5px; scrollbar-width: thin; }
+  .atalho { flex: none; white-space: nowrap; }
+}
+
+.dica-teclado code {
+  font-family: var(--mono); font-size: .76rem; padding: 1px 5px;
+  border-radius: 5px; background: var(--superficie); border: 1px solid var(--borda-forte);
+  text-transform: none;
+}
+
+.dica-teclado {
+  display: flex; gap: var(--e4); flex-wrap: wrap;
+  font-size: .8rem; color: var(--texto-2);
+  background: var(--superficie-2); border: 1px solid var(--borda);
+  border-radius: var(--r-sm); padding: 9px 13px;
+}
+kbd {
+  font-family: var(--mono); font-size: .74rem; padding: 1px 6px;
+  border: 1px solid var(--borda-forte); border-bottom-width: 2px;
+  border-radius: 5px; background: var(--superficie); color: var(--texto);
+}
+
+/* ============================================================================
+   GBIF — cards de divergência
+   A API sugere, nunca sobrescreve. Cada card tem Aceitar e Recusar, e some
+   quando o responsável técnico decide.
+   ========================================================================== */
+.gbif-barra {
+  display: flex; align-items: center; gap: var(--e3); flex-wrap: wrap;
+  background: var(--superficie-2); border: 1px solid var(--borda);
+  border-radius: var(--r-md); padding: var(--e3) var(--e4);
+}
+.progresso {
+  flex: 1; min-width: 160px; height: 8px; border-radius: 999px;
+  background: var(--superficie-3); overflow: hidden; border: 1px solid var(--borda);
+}
+.progresso i { display: block; height: 100%; background: var(--verde-600); width: 0; transition: width .2s linear; }
+.progresso-txt { font-size: .82rem; color: var(--texto-2); font-variant-numeric: tabular-nums; }
+
+.div-card {
+  border: 1px solid var(--borda); border-left: 4px solid var(--terra);
+  border-radius: var(--r-md); background: var(--superficie); padding: var(--e4);
+  display: grid; gap: var(--e2);
+}
+.div-card.tipo-digitacao { border-left-color: var(--terra); }
+.div-card.tipo-sinonimo { border-left-color: var(--verde-600); }
+.div-card.tipo-divergencia { border-left-color: var(--verde-500); }
+.div-card.tipo-rank { border-left-color: var(--texto-3); }
+.div-card.tipo-faltando { border-left-color: var(--borda-forte); }
+.div-topo { display: flex; align-items: baseline; gap: var(--e2); flex-wrap: wrap; }
+.div-troca { display: flex; align-items: center; gap: var(--e3); flex-wrap: wrap; font-size: .95rem; }
+.div-de, .div-para {
+  padding: 4px 10px; border-radius: var(--r-sm); font-weight: 620;
+  text-transform: none; word-break: break-word;
+}
+.div-de { background: var(--terra-50); color: var(--terra-600); text-decoration: line-through; text-decoration-thickness: 1px; }
+.div-para { background: var(--verde-100); color: var(--verde-800); }
+.div-seta { color: var(--texto-3); }
+.div-texto { font-size: .85rem; color: var(--texto-2); line-height: 1.5; }
+.div-acoes { display: flex; gap: var(--e2); flex-wrap: wrap; margin-top: 2px; }
+
+.estado-gbif { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; font-weight: 650; }
+.estado-gbif::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--texto-3); }
+.estado-gbif.confere::before { background: var(--verde-600); }
+.estado-gbif.divergente::before { background: var(--terra); }
+.estado-gbif.naoEncontrado::before, .estado-gbif.erro::before { background: var(--texto-3); }
+
+/* filtros de catálogo */
+.filtros { display: flex; gap: var(--e2); flex-wrap: wrap; align-items: center; }
+.filtros .campo { flex: 1 1 190px; }
+
+/* ---------------------------------------------------------------- relatório */
+.folha {
+  background: var(--superficie); border: 1px solid var(--borda);
+  border-radius: var(--r-lg); box-shadow: var(--sombra-2);
+  padding: 26mm 18mm; max-width: 210mm; margin: 0 auto;
+}
+.folha-topo { display: flex; align-items: center; gap: var(--e4); border-bottom: 2.5px solid var(--verde-800); padding-bottom: var(--e4); margin-bottom: var(--e5); }
+.folha-topo svg { width: 52px; height: 52px; flex: none; }
+.folha-marca { flex: 1; }
+.folha-marca h1 { font-size: 1.5rem; letter-spacing: -.025em; }
+.folha-marca p { color: var(--texto-2); font-size: .84rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+.folha-data { text-align: right; font-size: .82rem; color: var(--texto-2); }
+.folha section { margin-bottom: var(--e5); }
+.folha h2 {
+  font-size: .82rem; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--verde-800); border-bottom: 1px solid var(--borda);
+  padding-bottom: 5px; margin-bottom: var(--e3);
+}
+/* O h2 do laudo é caixa-alta de propósito — mas só ele, e nunca com nome de
+   táxon dentro. Por isso qualquer nome científico aninhado é destravado: */
+.folha h2 .cientifico, .folha h2 .taxon-sup { text-transform: none; letter-spacing: 0; }
+.folha h3 { font-size: .95rem; margin-bottom: var(--e2); }
+.ficha { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--e3) var(--e4); }
+.ficha div { font-size: .88rem; }
+.ficha dt { font-size: .72rem; text-transform: none; letter-spacing: .03em; color: var(--texto-3); font-weight: 650; }
+.ficha dd { font-weight: 600; }
+.folha .painel-num { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.assinatura { margin-top: var(--e7); display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--e6); align-items: end; }
+.assinatura div { border-top: 1px solid var(--texto-3); padding-top: 6px; text-align: center; font-size: .82rem; color: var(--texto-2); }
+.selo-folha { width: 78px; height: 78px; opacity: .9; margin-bottom: -4px; }
+.rodape-folha { margin-top: var(--e5); padding-top: var(--e3); border-top: 1px solid var(--borda); font-size: .72rem; color: var(--texto-3); text-align: center; }
+
+/* ------------------------------------------------------------------ ajuda */
+.ajuda { display: grid; gap: var(--e5); max-width: 68rem; }
+.ajuda .cartao {
+  background: var(--superficie); border: 1px solid var(--borda);
+  border-radius: var(--r-lg); box-shadow: var(--sombra-1); padding: var(--e5);
+}
+.ajuda .cartao h2 { margin: 0 0 var(--e2); font-size: 1.18rem; letter-spacing: -.01em; }
+.ajuda p { margin: 0 0 var(--e2); color: var(--texto-2); line-height: 1.65; max-width: 62ch; }
+.ajuda p:last-child { margin-bottom: 0; }
+.ajuda strong { color: var(--texto); font-weight: 650; }
+.ajuda code {
+  font-family: var(--mono); font-size: .84em; background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: 5px; padding: 1px 5px;
+}
+
+.passos { list-style: none; margin: var(--e4) 0 0; padding: 0; display: grid; gap: var(--e5); }
+.passos > li { display: grid; grid-template-columns: auto 1fr; gap: var(--e4); align-items: start; position: relative; }
+.passos h3 { margin: 0 0 6px; font-size: 1.02rem; color: var(--texto); }
+.passo-n {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--verde-600); color: #fff; font-weight: 700; font-size: .95rem;
+  font-variant-numeric: tabular-nums; flex: none;
+}
+.passos > li:not(:last-child)::before {
+  content: ''; position: absolute; left: 17px; top: 40px; bottom: calc(var(--e5) * -1);
+  width: 2px; background: var(--borda);
+}
+.dica {
+  background: var(--verde-100); border-left: 3px solid var(--verde-600);
+  padding: 8px var(--e3); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: .92rem;
+}
+.ajuda-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--e4); margin-top: var(--e3); }
+.ajuda-grade h3 { margin: 0 0 4px; font-size: .98rem; color: var(--verde-700); }
+.lista-aviso { margin: var(--e2) 0 0; padding-left: 1.15rem; display: grid; gap: var(--e2); list-style: disc; }
+.lista-aviso li { color: var(--texto-2); line-height: 1.6; }
+.formulas { display: grid; gap: var(--e2); margin-top: var(--e3); }
+.formulas div {
+  display: flex; justify-content: space-between; gap: var(--e4); flex-wrap: wrap;
+  padding: 8px 12px; background: var(--superficie-2); border: 1px solid var(--borda);
+  border-radius: var(--r-sm); font-size: .86rem;
+}
+.formulas b { font-weight: 640; }
+.formulas code { background: transparent; border: 0; color: var(--verde-800); font-weight: 600; }
+
+/* ==================================================== responsivo — 900px */
+@media (max-width: 900px) {
+  .topo-int { padding: var(--e3) var(--e4); gap: var(--e3); }
+
+  /* O backdrop-filter do cabeçalho cria um bloco de contenção: com ele ligado,
+     o position:fixed da barra se ancora no cabeçalho em vez da janela e a
+     barra aparece no topo. Desligado aqui para a barra de rodapé funcionar. */
+  .topo { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--superficie); }
+
+  /* Abaixo de 900px a navegação sai do topo e vira barra fixa no rodapé.
+     O João usa celular em campo — o polegar tem que alcançar tudo. */
+  .nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    width: auto; max-width: none; margin: 0; order: 0; overflow: visible;
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 0;
+    background: var(--superficie); border: 0; border-top: 1px solid var(--borda);
+    border-radius: 0;
+    padding: 6px 2px calc(6px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -2px 14px rgb(0 0 0 / .09);
+  }
+  .nav a {
+    display: grid; place-items: center; padding: 7px 2px; min-height: 44px;
+    border-radius: var(--r-sm); font-size: .68rem; line-height: 1.15; text-align: center;
+    letter-spacing: -.01em;
+  }
+  .nav a[aria-current="page"] { background: var(--primaria); color: var(--texto-inv); font-weight: 700; }
+  .btn-tema { margin-left: auto; }
+  main { padding: var(--e5) var(--e4) 96px; }   /* espaço para a barra de baixo */
+  .folha { padding: var(--e5) var(--e4); }
+  .lancador-grade { grid-template-columns: minmax(180px, 2fr) 84px 1fr; }
+  .lancador-grade .btn { grid-column: 1 / -1; width: 100%; }
+}
+
+@media (max-width: 760px) {
+  .item { flex-wrap: wrap; }
+  .item-acoes { width: 100%; justify-content: flex-end; }
+  .sub-item .titulo, .sub-item .meta { width: 100%; }
+}
+
+/* ========================================== celular (o João usa em campo) */
+@media (max-width: 640px) {
+  :root { --e7: 28px; }
+
+  /* 16px nos campos impede o zoom automático do iOS ao focar um input */
+  input, select, textarea { font-size: 16px; }
+
+  h1 { font-size: 1.42rem; }
+  .tela-cabec { flex-direction: column; align-items: stretch; gap: var(--e3); }
+  .tela-cabec p { font-size: .9rem; }
+
+  /* ações viram botões largos, fáceis de acertar com o polegar */
+  .acoes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); width: 100%; }
+  .acoes .btn { width: 100%; justify-content: center; min-height: 46px; padding: 10px 12px; }
+  .acoes .btn:only-child, .acoes .btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  .topo-int { padding: var(--e3); flex-wrap: nowrap; }
+  .card { padding: var(--e4); }
+
+  /* "Levantamento de fauna" é longo: em linha ele empurra o botão de tema
+     para uma segunda fileira e deixa o cabeçalho com um vão vazio. Empilhado
+     sob o nome, cabem os dois na mesma linha. */
+  .marca > span { display: flex; flex-direction: column; min-width: 0; }
+  .marca-nome { font-size: .96rem; }
+  .marca-sub { font-size: .62rem; letter-spacing: .07em; }
+  .marca svg { width: 30px; height: 30px; }
+
+  /* São 8 telas: em 8 colunas cada aba teria 45px e o rótulo não caberia.
+     Duas fileiras de 4 dão 44px de altura por alvo e o texto inteiro. */
+  .nav { grid-template-columns: repeat(4, 1fr); }
+  .nav a { font-size: .7rem; padding: 6px 2px; min-height: 40px; }
+  main { padding: var(--e4) var(--e3) 140px; }
+
+  .grade-2, .grade-3, .grade-4 { grid-template-columns: 1fr; }
+  .ajuda-grade { grid-template-columns: 1fr; }
+  .passos > li { grid-template-columns: auto 1fr; gap: var(--e3); }
+  .painel-num { grid-template-columns: 1fr 1fr; }
+
+  .lancador-grade { grid-template-columns: 1fr; }
+  .lancador-grade > * { grid-column: 1 / -1; }
+
+  /* o laudo A4 encolhe para caber sem rolagem lateral */
+  .folha { padding: var(--e4) var(--e3); box-shadow: none; border-radius: var(--r-md); }
+  .folha-topo { flex-wrap: wrap; gap: var(--e2); }
+  .ficha { grid-template-columns: 1fr 1fr; }
+  .assinatura { grid-template-columns: 1fr; gap: var(--e4); justify-items: center; }
+  .assinatura div { width: 100%; }
+  .selo-folha { width: 64px; height: 64px; }
+
+  /* Tabelas largas rolam dentro do próprio quadro, nunca a página. */
+  .card .tabela-envolve table.tabela { min-width: 30rem; }
+  table.tabela th, table.tabela td { padding: 8px 9px; }
+  .modal { width: calc(100vw - 24px); max-height: 88vh; overflow-y: auto; }
+  .trilha { font-size: .78rem; padding: 5px var(--e3); }
+}
+
+/* a barra de baixo não faz sentido impressa */
+@media print { .nav { display: none !important; } }
+
+/* --------------------------------------------------------------- impressão */
+@media print {
+  /* Os três seletores são necessários: @media não soma especificidade, então
+     um `:root` sozinho perde para `:root[data-tema="escuro"]` e o tema escuro
+     vaza para o papel — fundo preto, tinta gasta, laudo ilegível. Foi o que
+     aconteceu no app de solo. */
+  :root,
+  :root[data-tema="escuro"],
+  :root:not([data-tema="claro"]) {
+    --fundo: #fff; --superficie: #fff; --superficie-2: #f4f4f4; --superficie-3: #ececec;
+    --borda: #c9c9c9; --borda-forte: #a8a8a8; --texto: #111; --texto-2: #444; --texto-3: #666;
+    --texto-inv: #fff; --primaria: #1B5E3F;
+    --verde-50: #F4F9F6; --verde-100: #E8F2EC; --verde-300: #9CCDB2;
+    --verde-500: #58A87A; --verde-600: #2D7A4F; --verde-700: #1B5E3F;
+    --verde-800: #14472F; --verde-900: #0E3421;
+    --terra: #A2542D; --terra-50: #F7EFEA; --terra-600: #8B4526;
+  }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  @page { size: A4; margin: 12mm; }
+  body { background: #fff; font-size: 10.5pt; overflow: visible; }
+  .topo, .nao-imprime, .toast, .modal-fundo { display: none !important; }
+  main { padding: 0; max-width: none; }
+  .tela { display: none !important; }
+  .tela#tela-laudo, .tela#tela-laudo.ativa { display: block !important; }
+  .folha { box-shadow: none; border: 0; border-radius: 0; padding: 0; max-width: none; }
+  .folha section { margin-bottom: 14px; }
+  .folha h2 { break-after: avoid; }
+  .num-cx, .tabela-envolve, .grafico, .assinatura, .div-card { break-inside: avoid; }
+  .folha .painel-num, .folha .grade-2, .folha .ficha { break-inside: avoid; }
+  .grafico { max-width: 100%; }
+
+  /* as tabelas do laudo precisam caber na largura do A4 */
+  .folha .tabela-envolve { overflow: visible; border-radius: 0; }
+  .folha table.tabela { font-size: 7pt; table-layout: auto; }
+  .folha table.tabela th, .folha table.tabela td { padding: 3px 4px; }
+  .folha table.tabela thead th { position: static; }
+  .folha .painel-num { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .folha .grade-2 { grid-template-columns: 1fr 1fr; }
+  .folha .num-cx b { font-size: 1.2rem; }
+
+  a { color: inherit; text-decoration: none; }
+}
